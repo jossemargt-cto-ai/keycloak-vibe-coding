@@ -51,6 +51,13 @@
             <version>42.7.1</version>
         </dependency>
 
+        <!-- BCrypt for password hashing -->
+        <dependency>
+            <groupId>at.favre.lib</groupId>
+            <artifactId>bcrypt</artifactId>
+            <version>0.10.2</version>
+        </dependency>
+
         <!-- SLF4J for logging -->
         <dependency>
             <groupId>org.slf4j</groupId>

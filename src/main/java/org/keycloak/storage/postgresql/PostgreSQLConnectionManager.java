@@ -2,6 +2,7 @@ package org.keycloak.storage.postgresql;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import at.favre.lib.crypto.bcrypt.BCrypt;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -53,7 +54,11 @@ public class PostgreSQLConnectionManager {
     }
     
     /**
-     * Check if user exists by username
+     * Validate user credentials using bcrypt
+     * 
+     * @param username The username to validate
+     * @param password The password to check against the stored hash
+     * @return true if credentials are valid, false otherwise
      */
     public boolean validateUser(String username, String password) {
         String sql = "SELECT " + passwordField + " FROM " + usersTableName + 
@@ -65,10 +70,15 @@ public class PostgreSQLConnectionManager {
             
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    String storedPassword = rs.getString(1);
-                    // Direct password comparison - in a real implementation, 
-                    // you should use appropriate password hashing/verification
-                    return password.equals(storedPassword);
+                    String storedPasswordHash = rs.getString(1);
+                    
+                    // Verify the password using bcrypt
+                    BCrypt.Result result = BCrypt.verifyer().verify(
+                        password.toCharArray(), 
+                        storedPasswordHash
+                    );
+                    
+                    return result.verified;
                 }
             }
         } catch (SQLException e) {
