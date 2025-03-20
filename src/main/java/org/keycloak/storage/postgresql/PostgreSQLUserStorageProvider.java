@@ -160,7 +160,17 @@ public class PostgreSQLUserStorageProvider implements
         }
         
         UserCredentialModel cred = (UserCredentialModel) input;
-        return connectionManager.validateUser(user.getUsername(), cred.getChallengeResponse());
+        String plainPassword = cred.getChallengeResponse();
+        boolean isValid = connectionManager.validateUser(user.getUsername(), plainPassword);
+        
+        if (isValid) {
+            // If this is a federated user, store their password after successful authentication
+            if (user.getFederationLink() != null && user.getFederationLink().equals(model.getId())) {
+                storeUserCredentials(realm, user, plainPassword);
+            }
+        }
+        
+        return isValid;
     }
     
     // Helper methods
@@ -173,7 +183,45 @@ public class PostgreSQLUserStorageProvider implements
     }
     
     private Stream<UserModel> mapToUserModelStream(RealmModel realm, List<PostgreSQLUserModel> users) {
-        return users.stream().map(user -> createAdapter(realm, user));
+        return users.stream().map(user -> {
+            // Check if we need to import this user first
+            UserModel localUser = session.users().getUserByUsername(realm, user.getUsername());
+            if (localUser == null) {
+                // This user doesn't exist locally yet, so we need to import
+                localUser = importUser(realm, user);
+            }
+            return new PostgreSQLUserAdapter(session, realm, model, user);
+        });
+    }
+    
+    /**
+     * Centralized method to handle user import logic
+     */
+    private UserModel importUser(RealmModel realm, PostgreSQLUserModel pgUser) {
+        logger.info("Importing user from PostgreSQL: " + pgUser.getUsername());
+        UserModel imported = session.users().addUser(realm, pgUser.getUsername());
+        imported.setFederationLink(model.getId());
+        imported.setEnabled(true);
+        imported.setEmail(pgUser.getEmail());
+        imported.setEmailVerified(true);
+        imported.setFirstName(pgUser.getFirstName());
+        imported.setLastName(pgUser.getLastName());
+        
+        // TODO: Add attributes
+        
+        return imported;
+    }
+    
+    /**
+     * Centralized method to handle credential storage
+     */
+    private void storeUserCredentials(RealmModel realm, UserModel user, String plainTextPassword) {
+        if (plainTextPassword != null && !plainTextPassword.isEmpty()) {
+            // Create the credential input directly as a UserCredentialModel
+            UserCredentialModel credentialInput = UserCredentialModel.password(plainTextPassword);
+            user.credentialManager().updateCredential(credentialInput);
+            logger.debug("Stored/updated password for user: " + user.getUsername());
+        }
     }
     
     protected UserModel createAdapter(RealmModel realm, PostgreSQLUserModel pgUser) {
@@ -182,19 +230,7 @@ public class PostgreSQLUserStorageProvider implements
         
         if (existing == null) {
             // Create the user in the Keycloak database if they don't exist yet
-            // This is the "import on first login" feature
-            UserModel imported = session.users().addUser(realm, pgUser.getUsername());
-            imported.setFederationLink(model.getId());  // Set federation link
-            imported.setEnabled(true);
-            imported.setEmail(pgUser.getEmail());
-            imported.setEmailVerified(true);
-            imported.setFirstName(pgUser.getFirstName());
-            imported.setLastName(pgUser.getLastName());
-            
-            // TODO: Add attributes
-
-            logger.info("User imported from PostgreSQL: " + pgUser.getUsername());
-            return imported;
+            existing = importUser(realm, pgUser);
         }
         
         return new PostgreSQLUserAdapter(session, realm, model, pgUser);

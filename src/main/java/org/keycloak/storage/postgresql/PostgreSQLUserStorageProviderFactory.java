@@ -39,7 +39,7 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     // Default values
     private static final String DEFAULT_USERS_TABLE = "users";
     private static final String DEFAULT_USERNAME_FIELD = "username";
-    private static final String DEFAULT_PASSWORD_FIELD = "password";
+    private static final String DEFAULT_PASSWORD_FIELD = "password_digest";
     private static final String DEFAULT_EMAIL_FIELD = "email";
     private static final String DEFAULT_FIRSTNAME_FIELD = "first_name";
     private static final String DEFAULT_LASTNAME_FIELD = "last_name";
