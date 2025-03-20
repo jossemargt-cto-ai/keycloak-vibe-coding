@@ -4,19 +4,17 @@ import org.keycloak.credential.*;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.SubjectCredentialManager;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Empty credential manager implementation for read-only external users
+ * EmptyCredentialManager credential manager implementation for a read-only repository of
+ * external users (we simply have it to comply with the Keycloak SPI factory contract)
  */
 public class EmptyCredentialManager implements SubjectCredentialManager {
     
-    private final KeycloakSession session;
-    
-    public EmptyCredentialManager(KeycloakSession session) {
-        this.session = session;
+    public EmptyCredentialManager(KeycloakSession __) {
+        // No-op
     }
 
     @Override
