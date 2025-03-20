@@ -24,7 +24,7 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
 
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProviderFactory.class);
     
-    // Configuration properties
+    // Configuration properties (enables Admin UI overrides)
     public static final String JDBC_URL = "jdbcUrl";
     public static final String DB_USERNAME = "username";
     public static final String DB_PASSWORD = "password";
@@ -36,7 +36,7 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     public static final String LASTNAME_FIELD = "lastNameField";
     public static final String VALIDATION_QUERY = "validationQuery";
     
-    // Default values
+    // Default values (extracted from Legacy's database)
     private static final String DEFAULT_USERS_TABLE = "users";
     private static final String DEFAULT_USERNAME_FIELD = "username";
     private static final String DEFAULT_PASSWORD_FIELD = "password_digest";

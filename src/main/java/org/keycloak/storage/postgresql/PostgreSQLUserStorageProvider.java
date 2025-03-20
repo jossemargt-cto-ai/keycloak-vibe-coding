@@ -19,18 +19,18 @@ import java.util.stream.Stream;
  * PostgreSQL User Storage Provider implementation for read-only federation
  * with user import capability on first login
  */
-public class PostgreSQLUserStorageProvider implements 
-        UserStorageProvider, 
+public class PostgreSQLUserStorageProvider implements
+        UserStorageProvider,
         UserLookupProvider,
         UserQueryProvider,
         CredentialInputValidator {
 
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProvider.class);
-    
+
     protected KeycloakSession session;
     protected ComponentModel model;
     protected PostgreSQLConnectionManager connectionManager;
-    
+
     public PostgreSQLUserStorageProvider(KeycloakSession session, ComponentModel model, PostgreSQLConnectionManager connectionManager) {
         this.session = session;
         this.model = model;
@@ -42,7 +42,7 @@ public class PostgreSQLUserStorageProvider implements
     public void close() {
         // No resources to clean up
     }
-    
+
     // UserLookupProvider methods
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
@@ -67,7 +67,7 @@ public class PostgreSQLUserStorageProvider implements
         }
         return null;
     }
-    
+
     // UserQueryProvider methods
     @Override
     public Stream<UserModel> searchForUserStream(RealmModel realm, String search, Integer firstResult, Integer maxResults) {
@@ -108,10 +108,10 @@ public class PostgreSQLUserStorageProvider implements
         // Default search across multiple fields
         List<PostgreSQLUserModel> usersByUsername = connectionManager.searchForUserByUserAttribute("username", search, maxResults != null ? maxResults : 100);
         List<PostgreSQLUserModel> usersByEmail = connectionManager.searchForUserByUserAttribute("email", search, maxResults != null ? maxResults : 100);
-        
+
         Set<String> usernames = new HashSet<>();
         List<PostgreSQLUserModel> dedupUsers = new ArrayList<>();
-        
+
         // Deduplicate users from different search results
         for (PostgreSQLUserModel user : usersByUsername) {
             if (!usernames.contains(user.getUsername())) {
@@ -119,14 +119,14 @@ public class PostgreSQLUserStorageProvider implements
                 dedupUsers.add(user);
             }
         }
-        
+
         for (PostgreSQLUserModel user : usersByEmail) {
             if (!usernames.contains(user.getUsername())) {
                 usernames.add(user.getUsername());
                 dedupUsers.add(user);
             }
         }
-        
+
         return mapToUserModelStream(realm, dedupUsers);
     }
 
@@ -141,7 +141,7 @@ public class PostgreSQLUserStorageProvider implements
         // Not implemented for read-only federation
         return Stream.empty();
     }
-    
+
     // CredentialInputValidator methods
     @Override
     public boolean supportsCredentialType(String credentialType) {
@@ -158,21 +158,33 @@ public class PostgreSQLUserStorageProvider implements
         if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel)) {
             return false;
         }
-        
+
         UserCredentialModel cred = (UserCredentialModel) input;
         String plainPassword = cred.getChallengeResponse();
         boolean isValid = connectionManager.validateUser(user.getUsername(), plainPassword);
-        
-        if (isValid) {
-            // If this is a federated user, store their password after successful authentication
-            if (user.getFederationLink() != null && user.getFederationLink().equals(model.getId())) {
-                storeUserCredentials(realm, user, plainPassword);
-            }
+
+        if (!isValid) {
+            return false;
         }
-        
-        return isValid;
+
+        // Check if dealing with a federated user handle by this provider
+        String federationLink = user.getFederationLink();
+        if (federationLink == null || !federationLink.equals(model.getId())) {
+            return true;
+        }
+
+        // Import federated user and store credentials using Keycloak's hash algorithms
+        UserModel localUser = session.users().getUserByUsername(realm, user.getUsername());
+        boolean isLocalUser = localUser != null && localUser.getId().equals(user.getId());
+
+        if (!isLocalUser && user != null && user instanceof PostgreSQLUserModel) {
+            localUser = importUser(realm, (PostgreSQLUserModel) user);
+            storeUserCredentials(realm, localUser, plainPassword);
+        }
+
+        return true;
     }
-    
+
     // Helper methods
     private Stream<UserModel> getAll(RealmModel realm, Integer firstResult, Integer maxResults) {
         List<PostgreSQLUserModel> users = connectionManager.getAllUsers(
@@ -181,19 +193,11 @@ public class PostgreSQLUserStorageProvider implements
         );
         return mapToUserModelStream(realm, users);
     }
-    
+
     private Stream<UserModel> mapToUserModelStream(RealmModel realm, List<PostgreSQLUserModel> users) {
-        return users.stream().map(user -> {
-            // Check if we need to import this user first
-            UserModel localUser = session.users().getUserByUsername(realm, user.getUsername());
-            if (localUser == null) {
-                // This user doesn't exist locally yet, so we need to import
-                localUser = importUser(realm, user);
-            }
-            return new PostgreSQLUserAdapter(session, realm, model, user);
-        });
+        return users.stream().map(user -> createAdapter(realm, user));
     }
-    
+
     /**
      * Centralized method to handle user import logic
      */
@@ -206,12 +210,12 @@ public class PostgreSQLUserStorageProvider implements
         imported.setEmailVerified(true);
         imported.setFirstName(pgUser.getFirstName());
         imported.setLastName(pgUser.getLastName());
-        
+
         // TODO: Add attributes
-        
+
         return imported;
     }
-    
+
     /**
      * Centralized method to handle credential storage
      */
@@ -223,16 +227,8 @@ public class PostgreSQLUserStorageProvider implements
             logger.debug("Stored/updated password for user: " + user.getUsername());
         }
     }
-    
+
     protected UserModel createAdapter(RealmModel realm, PostgreSQLUserModel pgUser) {
-        // Check if user already exists in local storage
-        UserModel existing = session.users().getUserByUsername(realm, pgUser.getUsername());
-        
-        if (existing == null) {
-            // Create the user in the Keycloak database if they don't exist yet
-            existing = importUser(realm, pgUser);
-        }
-        
         return new PostgreSQLUserAdapter(session, realm, model, pgUser);
     }
 }
