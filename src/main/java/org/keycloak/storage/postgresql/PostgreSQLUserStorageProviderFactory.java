@@ -4,6 +4,7 @@ import org.keycloak.Config;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.RealmModel;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.provider.ProviderConfigurationBuilder;
@@ -182,8 +183,8 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     }
 
     @Override
-    public void postInit(KeycloakSession session) {
-        // Nothing to do
+    public void postInit(KeycloakSessionFactory factory) {
+        // NO-OP
     }
 
     @Override

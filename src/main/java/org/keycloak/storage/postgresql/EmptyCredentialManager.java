@@ -110,7 +110,9 @@ public class EmptyCredentialManager implements SubjectCredentialManager {
     }
 
     @Override
-    public CredentialMetadata getCredentialMetadata(CredentialModel credentialModel, CredentialTypeMetadata credentialTypeMetadata) {
-        return null;
+    public CredentialModel createCredentialThroughProvider(CredentialModel model) {
+        // TODO It has been deprecated so it _shouldn't_ be called
+        throw new UnsupportedOperationException("Unimplemented method 'createCredentialThroughProvider'");
     }
+
 }

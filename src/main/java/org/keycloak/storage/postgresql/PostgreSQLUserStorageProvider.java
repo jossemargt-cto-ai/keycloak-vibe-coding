@@ -16,7 +16,8 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
- * PostgreSQL User Storage Provider implementation
+ * PostgreSQL User Storage Provider implementation for read-only federation
+ * with user import capability on first login
  */
 public class PostgreSQLUserStorageProvider implements 
         UserStorageProvider, 
@@ -131,13 +132,13 @@ public class PostgreSQLUserStorageProvider implements
 
     @Override
     public Stream<UserModel> getGroupMembersStream(RealmModel realm, GroupModel group, Integer firstResult, Integer maxResults) {
-        // Not implemented in this simple example
+        // Not implemented for read-only federation
         return Stream.empty();
     }
 
     @Override
     public Stream<UserModel> searchForUserByUserAttributeStream(RealmModel realm, String attrName, String attrValue) {
-        // Not implemented for this simple example
+        // Not implemented for read-only federation
         return Stream.empty();
     }
     
@@ -177,11 +178,12 @@ public class PostgreSQLUserStorageProvider implements
     
     protected UserModel createAdapter(RealmModel realm, PostgreSQLUserModel pgUser) {
         // Check if user already exists in local storage
-        UserModel existing = session.userLocalStorage().getUserByUsername(realm, pgUser.getUsername());
+        UserModel existing = session.users().getUserByUsername(realm, pgUser.getUsername());
         
         if (existing == null) {
             // Create the user in the Keycloak database if they don't exist yet
-            UserModel imported = session.userLocalStorage().addUser(realm, pgUser.getUsername());
+            // This is the "import on first login" feature
+            UserModel imported = session.users().addUser(realm, pgUser.getUsername());
             imported.setFederationLink(model.getId());  // Set federation link
             imported.setEnabled(true);
             imported.setEmail(pgUser.getEmail());
@@ -189,6 +191,8 @@ public class PostgreSQLUserStorageProvider implements
             imported.setFirstName(pgUser.getFirstName());
             imported.setLastName(pgUser.getLastName());
             
+            // TODO: Add attributes
+
             logger.info("User imported from PostgreSQL: " + pgUser.getUsername());
             return imported;
         }
