@@ -22,7 +22,7 @@ import java.util.List;
  */
 public class PostgreSQLUserStorageProviderFactory implements UserStorageProviderFactory<PostgreSQLUserStorageProvider> {
 
-    private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProviderFactory.class);
+    public static final String PROVIDER_ID = "postgresql-user-storage";
     
     // Configuration properties (enables Admin UI overrides)
     public static final String JDBC_URL = "jdbcUrl";
@@ -45,6 +45,8 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     private static final String DEFAULT_LASTNAME_FIELD = "last_name";
     private static final String DEFAULT_VALIDATION_QUERY = "SELECT 1";
     
+    private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProviderFactory.class);
+
     protected static final List<ProviderConfigProperty> configMetadata;
     
     static {
@@ -126,7 +128,7 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     
     @Override
     public String getId() {
-        return "postgresql-user-storage";
+        return PROVIDER_ID;
     }
 
     @Override
@@ -189,7 +191,7 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
 
     @Override
     public void close() {
-        // Nothing to close
+        // NO-OP
     }
     
     private PostgreSQLConnectionManager getConnectionManager(ComponentModel config) {
