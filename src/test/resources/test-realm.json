@@ -7,10 +7,16 @@
     {
       "clientId": "test-client",
       "enabled": true,
-      "publicClient": true,
+      "publicClient": false,
       "directAccessGrantsEnabled": true,
       "redirectUris": ["*"],
-      "webOrigins": ["*"]
+      "webOrigins": ["*"],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["web-origins", "roles", "profile", "email"],
+      "clientAuthenticatorType": "client-secret",
+      "secret": "test-client-secret"
     }
   ],
   "roles": {
@@ -20,5 +26,33 @@
         "description": "User role"
       }
     ]
-  }
+  },
+  "defaultRoles": ["user"],
+  "clientScopes": [
+    {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "true"
+      }
+    },
+    {
+      "name": "profile",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    },
+    {
+      "name": "email",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    }
+  ],
+  "defaultDefaultClientScopes": ["roles", "profile", "email", "web-origins"]
 }
