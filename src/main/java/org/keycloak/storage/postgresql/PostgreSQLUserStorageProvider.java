@@ -198,6 +198,12 @@ public class PostgreSQLUserStorageProvider implements
         imported.setFirstName(pgUser.getFirstName());
         imported.setLastName(pgUser.getLastName());
 
+        // Clear all required actions that might be set by default
+        imported.getRequiredActionsStream().forEach(action -> {
+            imported.removeRequiredAction(action);
+            logger.debug("Removed required action '" + action + "' for imported user: " + imported.getUsername());
+        });
+
         // TODO: Add attributes
 
         return imported;
