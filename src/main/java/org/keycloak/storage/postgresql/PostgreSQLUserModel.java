@@ -5,20 +5,24 @@ package org.keycloak.storage.postgresql;
  */
 public class PostgreSQLUserModel {
     
-    private final String username;
-    private final String email;
+    private final String id; // UUID from database
+    private final String email; // Used as username
     private final String firstName;
     private final String lastName;
     
-    public PostgreSQLUserModel(String username, String email, String firstName, String lastName) {
-        this.username = username;
+    public PostgreSQLUserModel(String id, String email, String firstName, String lastName) {
+        this.id = id;
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
     }
     
+    public String getId() {
+        return id;
+    }
+    
     public String getUsername() {
-        return username;
+        return email; // Email is used as username
     }
     
     public String getEmail() {

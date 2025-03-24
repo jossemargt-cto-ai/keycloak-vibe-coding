@@ -46,17 +46,19 @@ public class PostgreSQLUserStorageProvider implements
     // UserLookupProvider methods
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
+        // The ID could be a StorageId for federated users or a direct UUID
         String externalId = StorageId.externalId(id);
-        return getUserByUsername(realm, externalId);
-    }
-
-    @Override
-    public UserModel getUserByUsername(RealmModel realm, String username) {
-        PostgreSQLUserModel pgUser = connectionManager.getUserByUsername(username);
+        PostgreSQLUserModel pgUser = connectionManager.getUserById(externalId);
         if (pgUser != null) {
             return createAdapter(realm, pgUser);
         }
         return null;
+    }
+
+    @Override
+    public UserModel getUserByUsername(RealmModel realm, String username) {
+        // Since email is used as username, we can use the email lookup method
+        return getUserByEmail(realm, username);
     }
 
     @Override
@@ -83,7 +85,8 @@ public class PostgreSQLUserStorageProvider implements
 
         String usernameSearch = params.get(UserModel.USERNAME);
         if (usernameSearch != null) {
-            List<PostgreSQLUserModel> users = connectionManager.searchForUserByUserAttribute("username", usernameSearch, maxResults != null ? maxResults : 100);
+            // Since email is username, search by email
+            List<PostgreSQLUserModel> users = connectionManager.searchForUserByUserAttribute("email", usernameSearch, maxResults != null ? maxResults : 100);
             return mapToUserModelStream(realm, users);
         }
 
@@ -106,28 +109,9 @@ public class PostgreSQLUserStorageProvider implements
         }
 
         // Default search across multiple fields
-        List<PostgreSQLUserModel> usersByUsername = connectionManager.searchForUserByUserAttribute("username", search, maxResults != null ? maxResults : 100);
+        // Only need to search by email since that's being used as username
         List<PostgreSQLUserModel> usersByEmail = connectionManager.searchForUserByUserAttribute("email", search, maxResults != null ? maxResults : 100);
-
-        Set<String> usernames = new HashSet<>();
-        List<PostgreSQLUserModel> dedupUsers = new ArrayList<>();
-
-        // Deduplicate users from different search results
-        for (PostgreSQLUserModel user : usersByUsername) {
-            if (!usernames.contains(user.getUsername())) {
-                usernames.add(user.getUsername());
-                dedupUsers.add(user);
-            }
-        }
-
-        for (PostgreSQLUserModel user : usersByEmail) {
-            if (!usernames.contains(user.getUsername())) {
-                usernames.add(user.getUsername());
-                dedupUsers.add(user);
-            }
-        }
-
-        return mapToUserModelStream(realm, dedupUsers);
+        return mapToUserModelStream(realm, usersByEmail);
     }
 
     @Override
@@ -161,7 +145,7 @@ public class PostgreSQLUserStorageProvider implements
 
         UserCredentialModel cred = (UserCredentialModel) input;
         String plainPassword = cred.getChallengeResponse();
-        boolean isValid = connectionManager.validateUser(user.getUsername(), plainPassword);
+        boolean isValid = connectionManager.validateUser(user.getEmail(), plainPassword);
 
         if (!isValid) {
             return false;
@@ -174,11 +158,12 @@ public class PostgreSQLUserStorageProvider implements
         }
 
         // Import federated user and store credentials using Keycloak's hash algorithms
-        UserModel localUser = session.users().getUserByUsername(realm, user.getUsername());
+        UserModel localUser = session.users().getUserByEmail(realm, user.getEmail());
         boolean isLocalUser = localUser != null && localUser.getId().equals(user.getId());
 
-        if (!isLocalUser && user != null && user instanceof PostgreSQLUserModel) {
-            localUser = importUser(realm, (PostgreSQLUserModel) user);
+        if (!isLocalUser && user instanceof PostgreSQLUserAdapter) {
+            PostgreSQLUserAdapter adapter = (PostgreSQLUserAdapter) user;
+            localUser = importUser(realm, adapter.getPostgreSQLUserModel());
             storeUserCredentials(realm, localUser, plainPassword);
         }
 
@@ -202,8 +187,10 @@ public class PostgreSQLUserStorageProvider implements
      * Centralized method to handle user import logic
      */
     private UserModel importUser(RealmModel realm, PostgreSQLUserModel pgUser) {
-        logger.info("Importing user from PostgreSQL: " + pgUser.getUsername());
-        UserModel imported = session.users().addUser(realm, pgUser.getUsername());
+        logger.info("Importing user from PostgreSQL: " + pgUser.getEmail());
+        
+        // Use email as the username since that's what the database uses
+        UserModel imported = session.users().addUser(realm, pgUser.getEmail());
         imported.setFederationLink(model.getId());
         imported.setEnabled(true);
         imported.setEmail(pgUser.getEmail());

@@ -33,7 +33,7 @@ public class PostgreSQLUserStorageProviderIT {
     private static final String TEST_REALM = "test-realm";
     private static final String TEST_CLIENT = "test-client";
     private static final String TEST_CLIENT_SECRET = "test-client-secret";
-    private static final String TEST_USER = "testuser";
+    private static final String TEST_USER_EMAIL = "testuser@example.com";
     private static final String TEST_PASSWORD = "testpassword";
 
     // Create shared network for containers
@@ -97,20 +97,21 @@ public class PostgreSQLUserStorageProviderIT {
     @Test
     void testUserLookup() {
         RealmResource realmResource = adminClient.realm(TEST_REALM);
-        List<UserRepresentation> users = realmResource.users().search(TEST_USER, 0, 1);
+        List<UserRepresentation> users = realmResource.users().search(TEST_USER_EMAIL, 0, 1);
 
         assertFalse(users.isEmpty(), "Test user should be found via federation");
-        assertEquals(TEST_USER, users.get(0).getUsername(), "Username should match");
+        assertEquals(TEST_USER_EMAIL, users.get(0).getUsername(), "Username should match the email");
+        assertEquals(TEST_USER_EMAIL, users.get(0).getEmail(), "Email should match");
     }
 
     @Test
     void testUserAuthentication() {
         try {
-            // Test direct grant login for the federated user
+            // Test direct grant login for the federated user with email as username
             Keycloak userClient = Keycloak.getInstance(
                     keycloakContainer.getAuthServerUrl(),
                     TEST_REALM,
-                    TEST_USER,
+                    TEST_USER_EMAIL,
                     TEST_PASSWORD,
                     TEST_CLIENT,
                     TEST_CLIENT_SECRET
@@ -131,7 +132,7 @@ public class PostgreSQLUserStorageProviderIT {
         Keycloak userClient = Keycloak.getInstance(
                 keycloakContainer.getAuthServerUrl(),
                 TEST_REALM,
-                TEST_USER,
+                TEST_USER_EMAIL,
                 TEST_PASSWORD,
                 TEST_CLIENT,
                 TEST_CLIENT_SECRET
@@ -141,7 +142,7 @@ public class PostgreSQLUserStorageProviderIT {
 
         // Then, verify the user was imported and exists in local storage
         RealmResource realmResource = adminClient.realm(TEST_REALM);
-        List<UserRepresentation> users = realmResource.users().search(TEST_USER, 0, 1);
+        List<UserRepresentation> users = realmResource.users().search(TEST_USER_EMAIL, 0, 1);
 
         assertFalse(users.isEmpty(), "User should exist in local storage after login");
         UserRepresentation user = users.get(0);
@@ -164,9 +165,8 @@ public class PostgreSQLUserStorageProviderIT {
             // Create users table
             conn.createStatement().execute(
                     "CREATE TABLE IF NOT EXISTS users (" +
-                    "  id VARCHAR(36) PRIMARY KEY," +
-                    "  username VARCHAR(255) NOT NULL UNIQUE," +
-                    "  email VARCHAR(255)," +
+                    "  id UUID PRIMARY KEY," +
+                    "  email VARCHAR(255) NOT NULL UNIQUE," +
                     "  first_name VARCHAR(255)," +
                     "  last_name VARCHAR(255)," +
                     "  password_digest VARCHAR(255) NOT NULL," +
@@ -175,22 +175,17 @@ public class PostgreSQLUserStorageProviderIT {
             );
 
             // Insert a test user with bcrypt password hash for 'testpassword'
-            // Note: In a real implementation, generate this properly
-
-            // This has gives 401, unknown number of rounds
-            String bcryptHash = "$2a$10$x.1AY/ovrVpR4QgFiZZ64.YPyJX2rXg8jP5PyDLD4lATAPlsVIB1W";
-            // this other gives 400, 12 rounds
-            // String bcryptHash = "$2a$12$BixlEhWIJXJfE1FI.Zb8G.jXBzE5EntaiGTwE1VhWs02ptXgYjfrG";
+            // Using a bcrypt hash compatible with the system
+            String bcryptHash = "$2y$12$cKlMe72KCTF6iMVk2SIFpegWs3tvq3.GwrhAXRKOmh16GIzOuR7Sq";
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO users (id, username, email, first_name, last_name, password_digest) " +
-                    "VALUES (?, ?, ?, ?, ?, ?)")) {
-                ps.setString(1, UUID.randomUUID().toString());
-                ps.setString(2, TEST_USER);
-                ps.setString(3, TEST_USER + "@example.com");
-                ps.setString(4, "Test");
-                ps.setString(5, "User");
-                ps.setString(6, bcryptHash);
+                    "INSERT INTO users (id, email, first_name, last_name, password_digest) " +
+                    "VALUES (?, ?, ?, ?, ?)")) {
+                ps.setObject(1, UUID.randomUUID());
+                ps.setString(2, TEST_USER_EMAIL);
+                ps.setString(3, "Test");
+                ps.setString(4, "User");
+                ps.setString(5, bcryptHash);
                 ps.executeUpdate();
             }
         }
@@ -217,11 +212,11 @@ public class PostgreSQLUserStorageProviderIT {
         config.putSingle("username", postgreSQLContainer.getUsername());
         config.putSingle("password", postgreSQLContainer.getPassword());
         config.putSingle("usersTable", "users");
-        config.putSingle("usernameColumn", "username");
-        config.putSingle("emailColumn", "email");
-        config.putSingle("firstNameColumn", "first_name");
-        config.putSingle("lastNameColumn", "last_name");
-        config.putSingle("passwordColumn", "password_digest");
+        config.putSingle("idField", "id");
+        config.putSingle("emailField", "email");
+        config.putSingle("firstNameField", "first_name");
+        config.putSingle("lastNameField", "last_name");
+        config.putSingle("passwordField", "password_digest");
 
         postgresProvider.setConfig(config);
 

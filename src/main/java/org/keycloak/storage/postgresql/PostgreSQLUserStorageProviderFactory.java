@@ -29,18 +29,18 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     public static final String DB_USERNAME = "username";
     public static final String DB_PASSWORD = "password";
     public static final String USERS_TABLE = "usersTable";
-    public static final String USERNAME_FIELD = "usernameField";
+    public static final String ID_FIELD = "idField"; // UUID field
+    public static final String EMAIL_FIELD = "emailField"; // Used as username
     public static final String PASSWORD_FIELD = "passwordField";
-    public static final String EMAIL_FIELD = "emailField";
     public static final String FIRSTNAME_FIELD = "firstNameField";
     public static final String LASTNAME_FIELD = "lastNameField";
     public static final String VALIDATION_QUERY = "validationQuery";
     
     // Default values (extracted from Legacy's database)
     private static final String DEFAULT_USERS_TABLE = "users";
-    private static final String DEFAULT_USERNAME_FIELD = "username";
-    private static final String DEFAULT_PASSWORD_FIELD = "password_digest";
+    private static final String DEFAULT_ID_FIELD = "id";
     private static final String DEFAULT_EMAIL_FIELD = "email";
+    private static final String DEFAULT_PASSWORD_FIELD = "password_digest";
     private static final String DEFAULT_FIRSTNAME_FIELD = "first_name";
     private static final String DEFAULT_LASTNAME_FIELD = "last_name";
     private static final String DEFAULT_VALIDATION_QUERY = "SELECT 1";
@@ -82,11 +82,18 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
                 .defaultValue(DEFAULT_USERS_TABLE)
                 .add()
             .property()
-                .name(USERNAME_FIELD)
-                .label("Username Field")
-                .helpText("Name of the column that contains usernames")
+                .name(ID_FIELD)
+                .label("ID Field")
+                .helpText("Name of the column that contains UUID identifiers")
                 .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_USERNAME_FIELD)
+                .defaultValue(DEFAULT_ID_FIELD)
+                .add()
+            .property()
+                .name(EMAIL_FIELD)
+                .label("Email Field")
+                .helpText("Name of the column that contains email addresses (used as username)")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .defaultValue(DEFAULT_EMAIL_FIELD)
                 .add()
             .property()
                 .name(PASSWORD_FIELD)
@@ -94,13 +101,6 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
                 .helpText("Name of the column that contains passwords")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .defaultValue(DEFAULT_PASSWORD_FIELD)
-                .add()
-            .property()
-                .name(EMAIL_FIELD)
-                .label("Email Field")
-                .helpText("Name of the column that contains email addresses")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_EMAIL_FIELD)
                 .add()
             .property()
                 .name(FIRSTNAME_FIELD)
@@ -199,9 +199,9 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
         String username = config.getConfig().getFirst(DB_USERNAME);
         String password = config.getConfig().getFirst(DB_PASSWORD);
         String usersTable = config.getConfig().getFirst(USERS_TABLE);
-        String usernameField = config.getConfig().getFirst(USERNAME_FIELD);
-        String passwordField = config.getConfig().getFirst(PASSWORD_FIELD);
+        String idField = config.getConfig().getFirst(ID_FIELD);
         String emailField = config.getConfig().getFirst(EMAIL_FIELD);
+        String passwordField = config.getConfig().getFirst(PASSWORD_FIELD);
         String firstNameField = config.getConfig().getFirst(FIRSTNAME_FIELD);
         String lastNameField = config.getConfig().getFirst(LASTNAME_FIELD);
         
@@ -210,16 +210,16 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
             usersTable = DEFAULT_USERS_TABLE;
         }
         
-        if (usernameField == null || usernameField.trim().isEmpty()) {
-            usernameField = DEFAULT_USERNAME_FIELD;
-        }
-        
-        if (passwordField == null || passwordField.trim().isEmpty()) {
-            passwordField = DEFAULT_PASSWORD_FIELD;
+        if (idField == null || idField.trim().isEmpty()) {
+            idField = DEFAULT_ID_FIELD;
         }
         
         if (emailField == null || emailField.trim().isEmpty()) {
             emailField = DEFAULT_EMAIL_FIELD;
+        }
+        
+        if (passwordField == null || passwordField.trim().isEmpty()) {
+            passwordField = DEFAULT_PASSWORD_FIELD;
         }
         
         if (firstNameField == null || firstNameField.trim().isEmpty()) {
@@ -235,7 +235,7 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
             username, 
             password, 
             usersTable, 
-            usernameField, 
+            idField, 
             passwordField, 
             emailField, 
             firstNameField, 

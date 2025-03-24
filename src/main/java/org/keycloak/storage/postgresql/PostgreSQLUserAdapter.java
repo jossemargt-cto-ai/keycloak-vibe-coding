@@ -23,7 +23,8 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
                                PostgreSQLUserModel pgUser) {
         super(session, realm, storageProviderModel);
         this.pgUser = pgUser;
-        this.keycloakId = StorageId.keycloakId(storageProviderModel, pgUser.getUsername());
+        // Use the UUID from database as the external ID for the StorageId
+        this.keycloakId = StorageId.keycloakId(storageProviderModel, pgUser.getId());
     }
 
     @Override
@@ -33,7 +34,8 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     @Override
     public String getUsername() {
-        return pgUser.getUsername();
+        // Use email as username
+        return pgUser.getEmail();
     }
 
     @Override
@@ -100,5 +102,12 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
     @Override
     public boolean isEmailVerified() {
         return true; // For this example, we assume emails are verified
+    }
+
+    /**
+     * Provide access to the underlying PostgreSQL user model
+     */
+    public PostgreSQLUserModel getPostgreSQLUserModel() {
+        return pgUser;
     }
 }
