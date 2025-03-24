@@ -8,6 +8,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 
 /**
  * Manages PostgreSQL database connections and queries for user federation
@@ -102,7 +103,7 @@ public class PostgreSQLConnectionManager {
         String sql = "SELECT " + idField + ", " + emailField + ", " + 
                      firstNameField + ", " + lastNameField + 
                      " FROM " + usersTableName + 
-                     " WHERE " + idField + " = ?";
+                     " WHERE " + idField + " = ?::uuid";
                      
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
