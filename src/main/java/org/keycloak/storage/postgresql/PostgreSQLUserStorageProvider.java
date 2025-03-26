@@ -139,13 +139,15 @@ public class PostgreSQLUserStorageProvider implements
 
     @Override
     public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {
-        if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel)) {
+        if (!supportsCredentialType(input.getType())) {
             return false;
         }
 
-        UserCredentialModel cred = (UserCredentialModel) input;
-        String plainPassword = cred.getChallengeResponse();
-        boolean isValid = connectionManager.validateUser(user.getEmail(), plainPassword);
+        String plainPassword = input.getChallengeResponse();
+        String storedPasswordHash = connectionManager.getPasswordHash(user.getEmail());
+
+        // Use the centralized password validation logic from BcryptCredentialManager
+        boolean isValid = BcryptCredentialManager.validatePassword(plainPassword, storedPasswordHash);
 
         if (!isValid) {
             return false;
@@ -188,7 +190,7 @@ public class PostgreSQLUserStorageProvider implements
      */
     private UserModel importUser(RealmModel realm, PostgreSQLUserModel pgUser) {
         logger.info("Importing user from PostgreSQL: " + pgUser.getEmail());
-        
+
         // Use email as the username since that's what the database uses
         UserModel imported = session.users().addUser(realm, pgUser.getEmail());
         imported.setFederationLink(model.getId());
@@ -214,7 +216,6 @@ public class PostgreSQLUserStorageProvider implements
      */
     private void storeUserCredentials(RealmModel realm, UserModel user, String plainTextPassword) {
         if (plainTextPassword != null && !plainTextPassword.isEmpty()) {
-            // Create the credential input directly as a UserCredentialModel
             UserCredentialModel credentialInput = UserCredentialModel.password(plainTextPassword);
             user.credentialManager().updateCredential(credentialInput);
             logger.debug("Stored/updated password for user: " + user.getUsername());
@@ -222,6 +223,7 @@ public class PostgreSQLUserStorageProvider implements
     }
 
     protected UserModel createAdapter(RealmModel realm, PostgreSQLUserModel pgUser) {
-        return new PostgreSQLUserAdapter(session, realm, model, pgUser);
+        SubjectCredentialManager credentialManager = new BcryptCredentialManager(session, pgUser.getEmail(), connectionManager);
+        return new PostgreSQLUserAdapter(session, realm, model, pgUser, credentialManager);
     }
 }

@@ -9,7 +9,6 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.provider.ProviderConfigurationBuilder;
 import org.keycloak.storage.UserStorageProviderFactory;
-import org.keycloak.storage.UserStorageProviderModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

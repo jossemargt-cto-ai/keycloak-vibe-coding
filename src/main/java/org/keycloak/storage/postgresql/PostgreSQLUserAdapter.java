@@ -9,6 +9,7 @@ import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Adapter that maps a PostgreSQL user to Keycloak's UserModel in read-only mode
@@ -17,12 +18,15 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     private final PostgreSQLUserModel pgUser;
     private final String keycloakId;
+    private final SubjectCredentialManager credentialManager;
 
     public PostgreSQLUserAdapter(KeycloakSession session, RealmModel realm,
                                ComponentModel storageProviderModel,
-                               PostgreSQLUserModel pgUser) {
+                               PostgreSQLUserModel pgUser,
+                               SubjectCredentialManager credentialManager) {
         super(session, realm, storageProviderModel);
         this.pgUser = pgUser;
+        this.credentialManager = credentialManager;
         // Use the UUID from database as the external ID for the StorageId
         this.keycloakId = StorageId.keycloakId(storageProviderModel, pgUser.getId());
     }
@@ -95,13 +99,23 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     @Override
     public SubjectCredentialManager credentialManager() {
-        // We won't allow credential management from Keycloak
-        return new EmptyCredentialManager(session);
+        // Return the credential manager provided during initialization
+        return credentialManager;
     }
 
     @Override
     public boolean isEmailVerified() {
-        return true; // For this example, we assume emails are verified
+        // TODO: Update with the actual table column for email verification
+        return true;
+    }
+
+    @Override
+    public Stream<String> getRequiredActionsStream() {
+        // TODO: Verify if this actually works (or if the other abstract methods need to be overrided)
+        // TODO: We might want to add the verify email action here based on the table field
+        // TODO: We might want to add the update password action here based an SPI property
+        // Return an empty stream to ensure no required actions are applied
+        return Stream.empty();
     }
 
     /**

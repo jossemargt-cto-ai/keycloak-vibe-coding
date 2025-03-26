@@ -3,24 +3,78 @@ package org.keycloak.storage.postgresql;
 import org.keycloak.credential.*;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.SubjectCredentialManager;
+import org.keycloak.models.credential.PasswordCredentialModel;
+import at.favre.lib.crypto.bcrypt.BCrypt;
 
 import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * EmptyCredentialManager credential manager implementation for a read-only repository of
- * external users (we simply have it to comply with the Keycloak SPI factory contract)
+ * BcryptCredentialManager handles credential validation using BCrypt for external user repositories
+ * This implementation is focused only on the SubjectCredentialManager responsibilities needed
+ * for a read-only user federation provider.
  */
-public class EmptyCredentialManager implements SubjectCredentialManager {
-    
-    public EmptyCredentialManager(KeycloakSession __) {
-        // No-op
+public class BcryptCredentialManager implements SubjectCredentialManager {
+
+    private final KeycloakSession session;
+    private final PostgreSQLConnectionManager connectionManager;
+    private final String email;
+
+    public BcryptCredentialManager(KeycloakSession session, String email, PostgreSQLConnectionManager connectionManager) {
+        this.session = session;
+        this.email = email;
+        this.connectionManager = connectionManager;
     }
 
+    /**
+     * Static method to validate a password against a stored hash using BCrypt
+     * This allows other components to use the same validation logic
+     */
+    public static boolean validatePassword(String plainPassword, String storedPasswordHash) {
+        if (storedPasswordHash == null || storedPasswordHash.isEmpty() || plainPassword == null) {
+            return false;
+        }
+
+        // Verify the password using bcrypt
+        BCrypt.Result result = BCrypt.verifyer().verify(
+            plainPassword.toCharArray(),
+            storedPasswordHash
+        );
+
+        return result.verified;
+    }
+
+    /**
+     * Validates credential inputs such as passwords using BCrypt
+     */
     @Override
     public boolean isValid(List<CredentialInput> inputs) {
-        // Credential validation is handled by our CredentialInputValidator implementation
-        return false;
+        for (CredentialInput input : inputs) {
+            if (supportsCredentialType(input.getType())) {
+                if (!isValid(input)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Internal method to validate a single credential input
+     */
+    private boolean isValid(CredentialInput input) {
+        if (!supportsCredentialType(input.getType())) {
+            return false;
+        }
+
+        String plainPassword = input.getChallengeResponse();
+        String storedPasswordHash = connectionManager.getPasswordHash(email);
+
+        return validatePassword(plainPassword, storedPasswordHash);
+    }
+
+    public boolean supportsCredentialType(String credentialType) {
+        return PasswordCredentialModel.TYPE.equals(credentialType);
     }
 
     @Override
@@ -31,7 +85,7 @@ public class EmptyCredentialManager implements SubjectCredentialManager {
 
     @Override
     public void updateStoredCredential(CredentialModel cred) {
-        // No-op
+        // No-op for read-only federation
     }
 
     @Override
@@ -78,12 +132,12 @@ public class EmptyCredentialManager implements SubjectCredentialManager {
 
     @Override
     public void updateCredentialLabel(String credentialId, String userLabel) {
-        // No-op
+        // No-op for read-only federation
     }
 
     @Override
     public void disableCredentialType(String credentialType) {
-        // No-op
+        // No-op for read-only federation
     }
 
     @Override
@@ -94,7 +148,7 @@ public class EmptyCredentialManager implements SubjectCredentialManager {
     @Override
     public boolean isConfiguredFor(String type) {
         // Always return true for password credentials since they're handled externally
-        return CredentialModel.PASSWORD.equals(type);
+        return PasswordCredentialModel.TYPE.equals(type);
     }
 
     @Override
@@ -104,13 +158,12 @@ public class EmptyCredentialManager implements SubjectCredentialManager {
 
     @Override
     public Stream<String> getConfiguredUserStorageCredentialTypesStream() {
-        return Stream.of(CredentialModel.PASSWORD);
+        return Stream.of(PasswordCredentialModel.TYPE);
     }
 
     @Override
     public CredentialModel createCredentialThroughProvider(CredentialModel model) {
-        // TODO It has been deprecated so it _shouldn't_ be called
+        // This method has been deprecated so it shouldn't be called
         throw new UnsupportedOperationException("Unimplemented method 'createCredentialThroughProvider'");
     }
-
 }
