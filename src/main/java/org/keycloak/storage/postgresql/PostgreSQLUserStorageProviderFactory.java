@@ -22,19 +22,21 @@ import java.util.List;
 public class PostgreSQLUserStorageProviderFactory implements UserStorageProviderFactory<PostgreSQLUserStorageProvider> {
 
     public static final String PROVIDER_ID = "postgresql-user-storage";
-    
+
     // Configuration properties (enables Admin UI overrides)
     public static final String JDBC_URL = "jdbcUrl";
     public static final String DB_USERNAME = "username";
     public static final String DB_PASSWORD = "password";
+    public static final String IMPORT_USERS = "importUsers";
+
+    // Non-overridable configuration properties (fixed values)
     public static final String USERS_TABLE = "usersTable";
     public static final String ID_FIELD = "idField"; // UUID field
     public static final String EMAIL_FIELD = "emailField"; // Used as username
     public static final String PASSWORD_FIELD = "passwordField";
     public static final String FIRSTNAME_FIELD = "firstNameField";
     public static final String LASTNAME_FIELD = "lastNameField";
-    public static final String VALIDATION_QUERY = "validationQuery";
-    
+
     // Default values (extracted from Legacy's database)
     private static final String DEFAULT_USERS_TABLE = "users";
     private static final String DEFAULT_ID_FIELD = "id";
@@ -42,12 +44,11 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     private static final String DEFAULT_PASSWORD_FIELD = "password_digest";
     private static final String DEFAULT_FIRSTNAME_FIELD = "first_name";
     private static final String DEFAULT_LASTNAME_FIELD = "last_name";
-    private static final String DEFAULT_VALIDATION_QUERY = "SELECT 1";
-    
+
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProviderFactory.class);
 
     protected static final List<ProviderConfigProperty> configMetadata;
-    
+
     static {
         // Configure the provider configuration properties
         configMetadata = ProviderConfigurationBuilder.create()
@@ -74,57 +75,15 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
                 .secret(true)
                 .add()
             .property()
-                .name(USERS_TABLE)
-                .label("Users Table")
-                .helpText("Name of the table that contains user information")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_USERS_TABLE)
-                .add()
-            .property()
-                .name(ID_FIELD)
-                .label("ID Field")
-                .helpText("Name of the column that contains UUID identifiers")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_ID_FIELD)
-                .add()
-            .property()
-                .name(EMAIL_FIELD)
-                .label("Email Field")
-                .helpText("Name of the column that contains email addresses (used as username)")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_EMAIL_FIELD)
-                .add()
-            .property()
-                .name(PASSWORD_FIELD)
-                .label("Password Field")
-                .helpText("Name of the column that contains passwords")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_PASSWORD_FIELD)
-                .add()
-            .property()
-                .name(FIRSTNAME_FIELD)
-                .label("First Name Field")
-                .helpText("Name of the column that contains first names")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_FIRSTNAME_FIELD)
-                .add()
-            .property()
-                .name(LASTNAME_FIELD)
-                .label("Last Name Field")
-                .helpText("Name of the column that contains last names")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_LASTNAME_FIELD)
-                .add()
-            .property()
-                .name(VALIDATION_QUERY)
-                .label("Validation Query")
-                .helpText("SQL query used to validate database connections")
-                .type(ProviderConfigProperty.STRING_TYPE)
-                .defaultValue(DEFAULT_VALIDATION_QUERY)
+                .name(IMPORT_USERS)
+                .label("Import Users")
+                .helpText("Flag to enable importing users into Keycloak's database")
+                .type(ProviderConfigProperty.BOOLEAN_TYPE)
+                .defaultValue("false")
                 .add()
             .build();
     }
-    
+
     @Override
     public String getId() {
         return PROVIDER_ID;
@@ -168,7 +127,8 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     @Override
     public PostgreSQLUserStorageProvider create(KeycloakSession session, ComponentModel model) {
         PostgreSQLConnectionManager connectionManager = getConnectionManager(model);
-        return new PostgreSQLUserStorageProvider(session, model, connectionManager);
+        boolean importUsers = Boolean.parseBoolean(model.getConfig().getFirst(IMPORT_USERS));
+        return new PostgreSQLUserStorageProvider(session, model, connectionManager, importUsers);
     }
 
     @Override
@@ -192,52 +152,29 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
     public void close() {
         // NO-OP
     }
-    
+
     private PostgreSQLConnectionManager getConnectionManager(ComponentModel config) {
         String jdbcUrl = config.getConfig().getFirst(JDBC_URL);
         String username = config.getConfig().getFirst(DB_USERNAME);
         String password = config.getConfig().getFirst(DB_PASSWORD);
-        String usersTable = config.getConfig().getFirst(USERS_TABLE);
-        String idField = config.getConfig().getFirst(ID_FIELD);
-        String emailField = config.getConfig().getFirst(EMAIL_FIELD);
-        String passwordField = config.getConfig().getFirst(PASSWORD_FIELD);
-        String firstNameField = config.getConfig().getFirst(FIRSTNAME_FIELD);
-        String lastNameField = config.getConfig().getFirst(LASTNAME_FIELD);
-        
-        // Use default values if not specified
-        if (usersTable == null || usersTable.trim().isEmpty()) {
-            usersTable = DEFAULT_USERS_TABLE;
-        }
-        
-        if (idField == null || idField.trim().isEmpty()) {
-            idField = DEFAULT_ID_FIELD;
-        }
-        
-        if (emailField == null || emailField.trim().isEmpty()) {
-            emailField = DEFAULT_EMAIL_FIELD;
-        }
-        
-        if (passwordField == null || passwordField.trim().isEmpty()) {
-            passwordField = DEFAULT_PASSWORD_FIELD;
-        }
-        
-        if (firstNameField == null || firstNameField.trim().isEmpty()) {
-            firstNameField = DEFAULT_FIRSTNAME_FIELD;
-        }
-        
-        if (lastNameField == null || lastNameField.trim().isEmpty()) {
-            lastNameField = DEFAULT_LASTNAME_FIELD;
-        }
-        
+
+        // Use fixed values for table and field names
+        String usersTable = DEFAULT_USERS_TABLE;
+        String idField = DEFAULT_ID_FIELD;
+        String emailField = DEFAULT_EMAIL_FIELD;
+        String passwordField = DEFAULT_PASSWORD_FIELD;
+        String firstNameField = DEFAULT_FIRSTNAME_FIELD;
+        String lastNameField = DEFAULT_LASTNAME_FIELD;
+
         return new PostgreSQLConnectionManager(
-            jdbcUrl, 
-            username, 
-            password, 
-            usersTable, 
-            idField, 
-            passwordField, 
-            emailField, 
-            firstNameField, 
+            jdbcUrl,
+            username,
+            password,
+            usersTable,
+            idField,
+            passwordField,
+            emailField,
+            firstNameField,
             lastNameField
         );
     }

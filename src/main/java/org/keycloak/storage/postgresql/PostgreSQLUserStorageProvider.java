@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 /**
  * PostgreSQL User Storage Provider implementation for read-only federation
- * with user import capability on first login
+ * with optional user import capability on first login
  */
 public class PostgreSQLUserStorageProvider implements
         UserStorageProvider,
@@ -30,11 +30,15 @@ public class PostgreSQLUserStorageProvider implements
     protected KeycloakSession session;
     protected ComponentModel model;
     protected PostgreSQLConnectionManager connectionManager;
+    protected boolean importUsers;
 
-    public PostgreSQLUserStorageProvider(KeycloakSession session, ComponentModel model, PostgreSQLConnectionManager connectionManager) {
+    public PostgreSQLUserStorageProvider(KeycloakSession session, ComponentModel model,
+                                        PostgreSQLConnectionManager connectionManager,
+                                        boolean importUsers) {
         this.session = session;
         this.model = model;
         this.connectionManager = connectionManager;
+        this.importUsers = importUsers;
     }
 
     // UserStorageProvider methods
@@ -149,8 +153,8 @@ public class PostgreSQLUserStorageProvider implements
         // Use the centralized password validation logic from BcryptCredentialManager
         boolean isValid = BcryptCredentialManager.validatePassword(plainPassword, storedPasswordHash);
 
-        if (!isValid) {
-            return false;
+        if (!isValid || !importUsers) {
+            return isValid;
         }
 
         // Check if dealing with a federated user handle by this provider
@@ -162,11 +166,11 @@ public class PostgreSQLUserStorageProvider implements
         // Import federated user and store credentials using Keycloak's hash algorithms
         UserModel localUser = session.users().getUserByEmail(realm, user.getEmail());
         boolean isLocalUser = localUser != null && localUser.getId().equals(user.getId());
-
         if (!isLocalUser && user instanceof PostgreSQLUserAdapter) {
             PostgreSQLUserAdapter adapter = (PostgreSQLUserAdapter) user;
             localUser = importUser(realm, adapter.getPostgreSQLUserModel());
             storeUserCredentials(realm, localUser, plainPassword);
+            logger.info("User imported to Keycloak database: " + user.getEmail());
         }
 
         return true;
