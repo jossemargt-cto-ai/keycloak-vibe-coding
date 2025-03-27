@@ -1,7 +1,6 @@
 package org.keycloak.storage.postgresql;
 
 import org.keycloak.credential.*;
-import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.credential.PasswordCredentialModel;
 import at.favre.lib.crypto.bcrypt.BCrypt;
