@@ -221,6 +221,7 @@ public class PostgreSQLUserStorageProvider implements
                     PostgreSQLUserModel.FIELD_LAST_NAME,
                     PostgreSQLUserModel.FIELD_DISABLED
                 ).contains(key)) {
+                    // TODO: do we truly need to prefix with FED_?
                     imported.setSingleAttribute("FED_" + key.toUpperCase(), value);
                 }
             });
@@ -241,7 +242,7 @@ public class PostgreSQLUserStorageProvider implements
     }
 
     protected UserModel createAdapter(RealmModel realm, PostgreSQLUserModel pgUser) {
-        SubjectCredentialManager credentialManager = new BcryptCredentialManager(session, pgUser.getEmail(), connectionManager);
+        SubjectCredentialManager credentialManager = new BcryptCredentialManager(pgUser.getEmail(), connectionManager);
         return new PostgreSQLUserAdapter(session, realm, model, pgUser, credentialManager);
     }
 }

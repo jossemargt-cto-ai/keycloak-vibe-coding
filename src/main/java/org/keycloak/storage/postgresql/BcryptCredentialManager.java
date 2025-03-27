@@ -16,12 +16,10 @@ import java.util.stream.Stream;
  */
 public class BcryptCredentialManager implements SubjectCredentialManager {
 
-    private final KeycloakSession session;
     private final PostgreSQLConnectionManager connectionManager;
     private final String email;
 
-    public BcryptCredentialManager(KeycloakSession session, String email, PostgreSQLConnectionManager connectionManager) {
-        this.session = session;
+    public BcryptCredentialManager(String email, PostgreSQLConnectionManager connectionManager) {
         this.email = email;
         this.connectionManager = connectionManager;
     }

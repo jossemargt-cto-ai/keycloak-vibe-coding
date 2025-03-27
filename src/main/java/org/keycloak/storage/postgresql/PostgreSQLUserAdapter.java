@@ -146,6 +146,8 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
             String value = entry.getValue();
 
             if (value != null && !MAPPED_FIELDS.contains(key)) {
+                // TODO: do we truly need to prefix with FED_?
+                // TODO: Handle multiple values
                 result.put("FED_" + key.toUpperCase(), Collections.singletonList(value));
             }
         }
