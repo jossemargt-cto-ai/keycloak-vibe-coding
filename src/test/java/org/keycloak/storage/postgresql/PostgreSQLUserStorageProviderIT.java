@@ -72,11 +72,7 @@ public class PostgreSQLUserStorageProviderIT {
     static void setup() throws SQLException {
         // Start containers
         postgreSQLContainer.start();
-        System.out.println("PostgreSQL container started at: " + postgreSQLContainer.getJdbcUrl());
-        System.out.println("PostgreSQL container network aliases: " + postgreSQLContainer.getNetworkAliases());
-
         keycloakContainer.start();
-        System.out.println("Keycloak container started at: " + keycloakContainer.getAuthServerUrl());
 
         // Initialize admin client using the container's built-in method
         adminClient = keycloakContainer.getKeycloakAdminClient();
@@ -169,13 +165,11 @@ public class PostgreSQLUserStorageProviderIT {
                     "  email VARCHAR(255) NOT NULL UNIQUE," +
                     "  first_name VARCHAR(255)," +
                     "  last_name VARCHAR(255)," +
-                    "  password_digest VARCHAR(255) NOT NULL," +
-                    "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                    "  password_digest VARCHAR(255) NOT NULL" +
                     ")"
             );
 
             // Insert a test user with bcrypt password hash for 'testpassword'
-            // Using a bcrypt hash compatible with the system
             String bcryptHash = "$2y$12$cKlMe72KCTF6iMVk2SIFpegWs3tvq3.GwrhAXRKOmh16GIzOuR7Sq";
 
             try (PreparedStatement ps = conn.prepareStatement(
@@ -211,12 +205,7 @@ public class PostgreSQLUserStorageProviderIT {
         config.putSingle("jdbcUrl", jdbcUrl);
         config.putSingle("username", postgreSQLContainer.getUsername());
         config.putSingle("password", postgreSQLContainer.getPassword());
-        config.putSingle("usersTable", "users");
-        config.putSingle("idField", "id");
-        config.putSingle("emailField", "email");
-        config.putSingle("firstNameField", "first_name");
-        config.putSingle("lastNameField", "last_name");
-        config.putSingle("passwordField", "password_digest");
+        config.putSingle("importUsers",  "true");
 
         postgresProvider.setConfig(config);
 

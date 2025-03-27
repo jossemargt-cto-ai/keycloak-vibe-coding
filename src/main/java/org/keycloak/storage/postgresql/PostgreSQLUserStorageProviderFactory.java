@@ -31,19 +31,9 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
 
     // Non-overridable configuration properties (fixed values)
     public static final String USERS_TABLE = "usersTable";
-    public static final String ID_FIELD = "idField"; // UUID field
-    public static final String EMAIL_FIELD = "emailField"; // Used as username
-    public static final String PASSWORD_FIELD = "passwordField";
-    public static final String FIRSTNAME_FIELD = "firstNameField";
-    public static final String LASTNAME_FIELD = "lastNameField";
 
     // Default values (extracted from Legacy's database)
     private static final String DEFAULT_USERS_TABLE = "users";
-    private static final String DEFAULT_ID_FIELD = "id";
-    private static final String DEFAULT_EMAIL_FIELD = "email";
-    private static final String DEFAULT_PASSWORD_FIELD = "password_digest";
-    private static final String DEFAULT_FIRSTNAME_FIELD = "first_name";
-    private static final String DEFAULT_LASTNAME_FIELD = "last_name";
 
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProviderFactory.class);
 
@@ -158,24 +148,14 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
         String username = config.getConfig().getFirst(DB_USERNAME);
         String password = config.getConfig().getFirst(DB_PASSWORD);
 
-        // Use fixed values for table and field names
+        // Use fixed values for table name
         String usersTable = DEFAULT_USERS_TABLE;
-        String idField = DEFAULT_ID_FIELD;
-        String emailField = DEFAULT_EMAIL_FIELD;
-        String passwordField = DEFAULT_PASSWORD_FIELD;
-        String firstNameField = DEFAULT_FIRSTNAME_FIELD;
-        String lastNameField = DEFAULT_LASTNAME_FIELD;
 
         return new PostgreSQLConnectionManager(
             jdbcUrl,
             username,
             password,
-            usersTable,
-            idField,
-            passwordField,
-            emailField,
-            firstNameField,
-            lastNameField
+            usersTable
         );
     }
 }

@@ -8,7 +8,9 @@ import org.keycloak.storage.ReadOnlyException;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -19,6 +21,15 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
     private final PostgreSQLUserModel pgUser;
     private final String keycloakId;
     private final SubjectCredentialManager credentialManager;
+
+    // List of fields that are directly mapped to Keycloak model
+    private static final List<String> MAPPED_FIELDS = List.of(
+            PostgreSQLUserModel.FIELD_EMAIL,
+            PostgreSQLUserModel.FIELD_EMAIL_VERIFIED,
+            PostgreSQLUserModel.FIELD_FIRST_NAME,
+            PostgreSQLUserModel.FIELD_LAST_NAME,
+            PostgreSQLUserModel.FIELD_DISABLED
+    );
 
     public PostgreSQLUserAdapter(KeycloakSession session, RealmModel realm,
                                ComponentModel storageProviderModel,
@@ -99,23 +110,69 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     @Override
     public SubjectCredentialManager credentialManager() {
-        // Return the credential manager provided during initialization
         return credentialManager;
     }
 
     @Override
     public boolean isEmailVerified() {
-        // TODO: Update with the actual table column for email verification
-        return true;
+        return pgUser.isEmailVerified();
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return !pgUser.isDisabled();
+    }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+        throw new ReadOnlyException("User is read-only in this federation provider");
     }
 
     @Override
     public Stream<String> getRequiredActionsStream() {
-        // TODO: Verify if this actually works (or if the other abstract methods need to be overrided)
-        // TODO: We might want to add the verify email action here based on the table field
-        // TODO: We might want to add the update password action here based an SPI property
         // Return an empty stream to ensure no required actions are applied
         return Stream.empty();
+    }
+
+    @Override
+    public Map<String, List<String>> getAttributes() {
+        Map<String, String> attributes = pgUser.getAttributes();
+        Map<String, List<String>> result = super.getAttributes();
+
+        // Add all the attributes from the PostgreSQL user with the FED_ prefix
+        // Skip the directly mapped fields
+        for (Map.Entry<String, String> entry : attributes.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+
+            if (value != null && !MAPPED_FIELDS.contains(key)) {
+                result.put("FED_" + key.toUpperCase(), Collections.singletonList(value));
+            }
+        }
+
+        return result;
+    }
+
+    @Override
+    public Stream<String> getAttributeStream(String name) {
+        // If it's a standard attribute mapped directly, use the super implementation
+        if (super.getAttributes().containsKey(name)) {
+            return super.getAttributeStream(name);
+        }
+
+        // Check if it's one of our prefixed attributes
+        if (name.startsWith("FED_")) {
+            String dbFieldName = name.substring(4).toLowerCase(); // Remove the FED_ prefix and convert to lowercase
+            String value = pgUser.getAttribute(dbFieldName);
+            return value != null ? Stream.of(value) : Stream.empty();
+        }
+
+        return Stream.empty();
+    }
+
+    @Override
+    public List<String> getAttribute(String name) {
+        return getAttributeStream(name).toList();
     }
 
     /**

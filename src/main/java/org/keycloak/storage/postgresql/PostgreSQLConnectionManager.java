@@ -18,26 +18,14 @@ public class PostgreSQLConnectionManager {
     private final Properties connectionProps;
 
     private final String usersTableName;
-    private final String idField; // UUID field
-    private final String emailField; // Used as username
-    private final String passwordField;
-    private final String firstNameField;
-    private final String lastNameField;
 
-    public PostgreSQLConnectionManager(String jdbcUrl, String username, String password,
-                                      String usersTableName, String idField, String passwordField,
-                                      String emailField, String firstNameField, String lastNameField) {
+    public PostgreSQLConnectionManager(String jdbcUrl, String username, String password, String usersTableName) {
         this.jdbcUrl = jdbcUrl;
         this.connectionProps = new Properties();
         this.connectionProps.put("user", username);
         this.connectionProps.put("password", password);
 
         this.usersTableName = usersTableName;
-        this.idField = idField;
-        this.passwordField = passwordField;
-        this.emailField = emailField;
-        this.firstNameField = firstNameField;
-        this.lastNameField = lastNameField;
     }
 
     /**
@@ -59,8 +47,9 @@ public class PostgreSQLConnectionManager {
      * @return The stored password hash or null if not found
      */
     public String getPasswordHash(String email) {
-        String sql = "SELECT " + passwordField + " FROM " + usersTableName +
-                     " WHERE " + emailField + " = ?";
+        String sql = "SELECT " + PostgreSQLUserModel.FIELD_PASSWORD_DIGEST +
+                     " FROM " + usersTableName +
+                     " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -89,10 +78,8 @@ public class PostgreSQLConnectionManager {
      * Gets user by ID (UUID)
      */
     public PostgreSQLUserModel getUserById(String id) {
-        String sql = "SELECT " + idField + ", " + emailField + ", " +
-                     firstNameField + ", " + lastNameField +
-                     " FROM " + usersTableName +
-                     " WHERE " + idField + " = ?::uuid";
+        String sql = "SELECT * FROM " + usersTableName +
+                     " WHERE " + PostgreSQLUserModel.FIELD_ID + " = ?::uuid";
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -114,10 +101,8 @@ public class PostgreSQLConnectionManager {
      * Gets user by email
      */
     public PostgreSQLUserModel getUserByEmail(String email) {
-        String sql = "SELECT " + idField + ", " + emailField + ", " +
-                     firstNameField + ", " + lastNameField +
-                     " FROM " + usersTableName +
-                     " WHERE " + emailField + " = ?";
+        String sql = "SELECT * FROM " + usersTableName +
+                     " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -145,24 +130,22 @@ public class PostgreSQLConnectionManager {
         // Map attribute name to column name
         switch(attributeName) {
             case "username":
-                column = emailField; // Since email is username
+                column = PostgreSQLUserModel.FIELD_EMAIL; // Since email is username
                 break;
             case "email":
-                column = emailField;
+                column = PostgreSQLUserModel.FIELD_EMAIL;
                 break;
             case "firstName":
-                column = firstNameField;
+                column = PostgreSQLUserModel.FIELD_FIRST_NAME;
                 break;
             case "lastName":
-                column = lastNameField;
+                column = PostgreSQLUserModel.FIELD_LAST_NAME;
                 break;
             default:
                 return users; // Return empty list for unsupported attributes
         }
 
-        String sql = "SELECT " + idField + ", " + emailField + ", " +
-                     firstNameField + ", " + lastNameField +
-                     " FROM " + usersTableName +
+        String sql = "SELECT * FROM " + usersTableName +
                      " WHERE " + column + " LIKE ?" +
                      " LIMIT " + maxResults;
 
@@ -188,9 +171,7 @@ public class PostgreSQLConnectionManager {
     public List<PostgreSQLUserModel> getAllUsers(int firstResult, int maxResults) {
         List<PostgreSQLUserModel> users = new ArrayList<>();
 
-        String sql = "SELECT " + idField + ", " + emailField + ", " +
-                     firstNameField + ", " + lastNameField +
-                     " FROM " + usersTableName +
+        String sql = "SELECT * FROM " + usersTableName +
                      " LIMIT ? OFFSET ?";
 
         try (Connection conn = getConnection();
@@ -233,11 +214,20 @@ public class PostgreSQLConnectionManager {
      * Maps a result set to a PostgreSQLUserModel
      */
     private PostgreSQLUserModel mapUser(ResultSet rs) throws SQLException {
-        String id = rs.getString(idField);
-        String email = rs.getString(emailField);
-        String firstName = rs.getString(firstNameField);
-        String lastName = rs.getString(lastNameField);
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
 
-        return new PostgreSQLUserModel(id, email, firstName, lastName);
+        PostgreSQLUserModel user = new PostgreSQLUserModel();
+
+        for (int i = 1; i <= columnCount; i++) {
+            String columnName = metaData.getColumnName(i).toLowerCase();
+            String value = rs.getString(i);
+
+            if (value != null) {
+                user.setAttribute(columnName, value);
+            }
+        }
+
+        return user;
     }
 }

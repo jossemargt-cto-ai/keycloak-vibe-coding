@@ -198,9 +198,9 @@ public class PostgreSQLUserStorageProvider implements
         // Use email as the username since that's what the database uses
         UserModel imported = session.users().addUser(realm, pgUser.getEmail());
         imported.setFederationLink(model.getId());
-        imported.setEnabled(true);
+        imported.setEnabled(!pgUser.isDisabled());
         imported.setEmail(pgUser.getEmail());
-        imported.setEmailVerified(true);
+        imported.setEmailVerified(pgUser.isEmailVerified());
         imported.setFirstName(pgUser.getFirstName());
         imported.setLastName(pgUser.getLastName());
 
@@ -210,7 +210,21 @@ public class PostgreSQLUserStorageProvider implements
             logger.debug("Removed required action '" + action + "' for imported user: " + imported.getUsername());
         });
 
-        // TODO: Add attributes
+        // Dynamically map remaining columns as attributes with the FED_ prefix
+        Map<String, String> attributes = pgUser.getAttributes();
+        if (attributes != null) {
+            attributes.forEach((key, value) -> {
+                if (value != null && !List.of(
+                    PostgreSQLUserModel.FIELD_EMAIL,
+                    PostgreSQLUserModel.FIELD_EMAIL_VERIFIED,
+                    PostgreSQLUserModel.FIELD_FIRST_NAME,
+                    PostgreSQLUserModel.FIELD_LAST_NAME,
+                    PostgreSQLUserModel.FIELD_DISABLED
+                ).contains(key)) {
+                    imported.setSingleAttribute("FED_" + key.toUpperCase(), value);
+                }
+            });
+        }
 
         return imported;
     }
