@@ -144,23 +144,21 @@ public class BcryptCredentialManager implements SubjectCredentialManager {
 
     @Override
     public boolean isConfiguredFor(String type) {
-        // Always return true for password credentials since they're handled externally
         return PasswordCredentialModel.TYPE.equals(type);
     }
 
-    @Override
+    @Override // Deprecated on SubjectCredentialManager
     public boolean isConfiguredLocally(String type) {
         return false;
     }
 
-    @Override
+    @Override // Deprecated on SubjectCredentialManager
     public Stream<String> getConfiguredUserStorageCredentialTypesStream() {
         return Stream.of(PasswordCredentialModel.TYPE);
     }
 
-    @Override
+    @Override // Deprecated on SubjectCredentialManager
     public CredentialModel createCredentialThroughProvider(CredentialModel model) {
-        // This method has been deprecated so it shouldn't be called
         throw new UnsupportedOperationException("Unimplemented method 'createCredentialThroughProvider'");
     }
 }
