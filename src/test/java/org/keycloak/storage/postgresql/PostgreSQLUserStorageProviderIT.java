@@ -62,7 +62,7 @@ public class PostgreSQLUserStorageProviderIT {
             .withNetwork(SHARED_NETWORK)
             .withNetworkAliases("keycloak")
             .dependsOn(postgreSQLContainer)
-            .withStartupTimeout(Duration.ofMinutes(2)) // Increase timeout to 2 minutes
+            .withStartupTimeout(Duration.ofMinutes(2))
             .withLogConsumer(outputFrame -> System.out.print(outputFrame.getUtf8String()));
 
     private static Keycloak adminClient;

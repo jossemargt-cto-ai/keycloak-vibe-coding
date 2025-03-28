@@ -170,11 +170,13 @@ public class BridgeResourceProvider implements RealmResourceProvider {
      * Build the URL for the token endpoint in the current realm
      */
     private String buildTokenEndpointUrl(UriInfo uriInfo, RealmModel realm) {
-        String baseUrl = uriInfo.getBaseUri().toString();
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        // Use the KeycloakSession's context to get the correct base URL that respects Keycloak's configuration
+        String authServerBaseUrl = uriInfo.getBaseUri().toString();
+        if (authServerBaseUrl.endsWith("/")) {
+            authServerBaseUrl = authServerBaseUrl.substring(0, authServerBaseUrl.length() - 1);
         }
-        return baseUrl + "/realms/" + realm.getName() + "/protocol/openid-connect/token";
+
+        return authServerBaseUrl + "/realms/" + realm.getName() + "/protocol/openid-connect/token";
     }
 
     /**
@@ -194,6 +196,8 @@ public class BridgeResourceProvider implements RealmResourceProvider {
      * Forward the token request to the OIDC token endpoint and return the response
      */
     private Response forwardTokenRequest(String tokenEndpointUrl, Map<String, String> formParams) throws IOException {
+        LOG.debug("Forwarding token request to: " + tokenEndpointUrl);
+
         // Get the HttpClient from Keycloak's HttpClientProvider
         CloseableHttpClient httpClient = session.getProvider(HttpClientProvider.class).getHttpClient();
 
