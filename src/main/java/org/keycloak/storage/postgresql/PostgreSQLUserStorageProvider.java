@@ -20,6 +20,7 @@ import java.util.stream.Stream;
  * with optional user import capability on first login
  */
 public class PostgreSQLUserStorageProvider implements
+        // TODO: Add GroupStorageProvider to map group membership
         UserStorageProvider,
         UserLookupProvider,
         UserQueryProvider,

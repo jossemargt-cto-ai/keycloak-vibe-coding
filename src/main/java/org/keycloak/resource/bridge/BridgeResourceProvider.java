@@ -227,8 +227,6 @@ public class BridgeResourceProvider implements RealmResourceProvider {
             // Get response body
             String responseBody = EntityUtils.toString(response.getEntity());
 
-            LOG.debugf("Token response status: %d", statusCode);
-
             // Build JAX-RS response
             return Response.status(statusCode)
                     .entity(responseBody)

@@ -85,7 +85,6 @@ public class BridgeResourceProviderIT {
     void testBridgeTokenEndpoint() throws Exception {
         // Build the bridge token endpoint URL
         String bridgeEndpointUrl = keycloakContainer.getAuthServerUrl() + "/realms/" + TEST_REALM + "/bridge/token";
-        System.out.println("External Bridge URL: " + bridgeEndpointUrl);
 
         // Prepare the credentials payload
         Map<String, String> credentials = new HashMap<>();
@@ -137,6 +136,8 @@ public class BridgeResourceProviderIT {
 
         // Assert the response contains the expected error information
         assertTrue(responseJson.has("error"), "Response should contain error field");
+
+        // TODO: It should be "invalid_credential" but this is how it comes from the OIDC endpoint. It will be fixed in the future.
         assertEquals("invalid_grant", responseJson.get("error").asText(), "Error should be invalid_grant");
     }
 
