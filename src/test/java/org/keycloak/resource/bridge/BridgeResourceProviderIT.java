@@ -104,11 +104,41 @@ public class BridgeResourceProviderIT {
         String responseBody = response.readEntity(String.class);
         JsonNode responseJson = MAPPER.readTree(responseBody);
 
-        // Assert the response contains expected OAuth tokens
+        // Assert the response contains expected OAuth tokens (legacy format still maintained)
         assertTrue(responseJson.has("access_token"), "Response should contain access_token");
         assertTrue(responseJson.has("refresh_token"), "Response should contain refresh_token");
         assertTrue(responseJson.has("token_type"), "Response should contain token_type");
         assertEquals("Bearer", responseJson.get("token_type").asText(), "Token type should be Bearer");
+
+        // Assert the new response structure is present
+        // Verify token object structure
+        assertTrue(responseJson.has("token"), "Response should contain token object");
+        JsonNode tokenNode = responseJson.get("token");
+        assertTrue(tokenNode.isObject(), "token should be an object");
+        assertTrue(tokenNode.has("token"), "token.token should exist");
+        assertEquals(responseJson.get("access_token").asText(), tokenNode.get("token").asText(),
+                "token.token should match access_token");
+
+        // Verify creation timestamp
+        assertTrue(tokenNode.has("created_at"), "token.created_at should exist");
+        assertTrue(tokenNode.get("created_at").isNumber(), "token.created_at should be a number");
+        long createdAt = tokenNode.get("created_at").asLong();
+        long currentTime = System.currentTimeMillis() / 1000;
+        assertTrue(createdAt <= currentTime, "created_at should be less than or equal to current time");
+        assertTrue(createdAt > currentTime - 60, "created_at should be recent (within last minute)");
+
+        // Verify user object
+        assertTrue(responseJson.has("user"), "Response should contain user object");
+        JsonNode userNode = responseJson.get("user");
+        assertTrue(userNode.isObject(), "user should be an object");
+
+        // Verify some expected user attributes from userinfo endpoint
+        assertTrue(userNode.has("sub"), "user.sub should exist");
+        // Test user might have username set, which should match our test user
+        if (userNode.has("preferred_username")) {
+            assertEquals(TEST_USER, userNode.get("preferred_username").asText(),
+                    "preferred_username should match test user");
+        }
     }
 
     @Test

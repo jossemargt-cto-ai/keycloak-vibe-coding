@@ -33,7 +33,9 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.services.resource.RealmResourceProvider;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Bridge Resource Provider that exposes REST endpoints for token bridging.
@@ -142,6 +144,7 @@ public class BridgeResourceProvider implements RealmResourceProvider {
             Map<String, String> formParams = new HashMap<>();
             formParams.put(OAuth2Constants.GRANT_TYPE, OAuth2Constants.PASSWORD);
             formParams.put(OAuth2Constants.CLIENT_ID, effectiveClientId);
+            formParams.put(OAuth2Constants.SCOPE, "openid"); // Add openid scope to properly identify as an OIDC request
             formParams.put("username", credentials.getUsername());
             formParams.put("password", credentials.getPassword());
 
@@ -180,6 +183,19 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     }
 
     /**
+     * Build the URL for the userinfo endpoint in the current realm
+     */
+    private String buildUserInfoEndpointUrl(UriInfo uriInfo, RealmModel realm) {
+        // Use the KeycloakSession's context to get the correct base URL that respects Keycloak's configuration
+        String authServerBaseUrl = uriInfo.getBaseUri().toString();
+        if (authServerBaseUrl.endsWith("/")) {
+            authServerBaseUrl = authServerBaseUrl.substring(0, authServerBaseUrl.length() - 1);
+        }
+
+        return authServerBaseUrl + "/realms/" + realm.getName() + "/protocol/openid-connect/userinfo";
+    }
+
+    /**
      * Helper method to URL encode form parameter values
      */
     private String encodeFormParameter(String value) {
@@ -193,7 +209,7 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     }
 
     /**
-     * Forward the token request to the OIDC token endpoint and return the response
+     * Forward the token request to the OIDC token endpoint, then get user info, and return combined response
      */
     private Response forwardTokenRequest(String tokenEndpointUrl, Map<String, String> formParams) throws IOException {
         LOG.debug("Forwarding token request to: " + tokenEndpointUrl);
@@ -227,11 +243,92 @@ public class BridgeResourceProvider implements RealmResourceProvider {
             // Get response body
             String responseBody = EntityUtils.toString(response.getEntity());
 
-            // Build JAX-RS response
+            // If the token request was not successful, just return the error response
+            if (statusCode != 200) {
+                return Response.status(statusCode)
+                        .entity(responseBody)
+                        .type(MediaType.APPLICATION_JSON_TYPE)
+                        .build();
+            }
+
+            // Parse the token response to get the access token
+            JsonNode tokenResponse = MAPPER.readTree(responseBody);
+            if (tokenResponse.has("access_token")) {
+                String accessToken = tokenResponse.get("access_token").asText();
+
+                // Fetch user info using the access token
+                UriInfo uriInfo = session.getContext().getUri();
+                RealmModel realm = session.getContext().getRealm();
+                String userInfoUrl = buildUserInfoEndpointUrl(uriInfo, realm);
+
+                JsonNode userInfo = fetchUserInfo(userInfoUrl, accessToken);
+
+                // Create a combined response with both token and user metadata
+                return createCombinedResponse(tokenResponse, userInfo);
+            }
+
+            // If we couldn't get the access token for some reason, return the original response
             return Response.status(statusCode)
                     .entity(responseBody)
                     .type(MediaType.APPLICATION_JSON_TYPE)
                     .build();
         }
+    }
+
+    /**
+     * Fetch user information from the OIDC userinfo endpoint
+     */
+    private JsonNode fetchUserInfo(String userInfoUrl, String accessToken) throws IOException {
+        LOG.debug("Fetching user info from: " + userInfoUrl);
+
+        // Get the HttpClient from Keycloak's HttpClientProvider
+        CloseableHttpClient httpClient = session.getProvider(HttpClientProvider.class).getHttpClient();
+
+        // Create GET request to userinfo endpoint
+        org.apache.http.client.methods.HttpGet httpGet = new org.apache.http.client.methods.HttpGet(userInfoUrl);
+        httpGet.setHeader("Authorization", "Bearer " + accessToken);
+
+        // Execute request
+        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            // Get response status
+            int statusCode = response.getStatusLine().getStatusCode();
+
+            // Get response body
+            String responseBody = EntityUtils.toString(response.getEntity());
+
+            if (statusCode == 200) {
+                return MAPPER.readTree(responseBody);
+            } else {
+                LOG.warnf("Failed to get user info, status: %d, response: %s", statusCode, responseBody);
+                return MAPPER.createObjectNode();
+            }
+        }
+    }
+
+    /**
+     * Create a combined response with both token data and user info
+     */
+    private Response createCombinedResponse(JsonNode tokenResponse, JsonNode userInfo) throws IOException {
+        // Create our new response structure
+        ObjectNode combined = MAPPER.createObjectNode();
+
+        // Add all token fields from the original response
+        tokenResponse.fieldNames().forEachRemaining(fieldName -> {
+            combined.set(fieldName, tokenResponse.get(fieldName));
+        });
+
+        // Extract the access token to its own member
+        if (tokenResponse.has("access_token")) {
+            // Create a token object with the access_token under "token" field and add creation timestamp
+            ObjectNode tokenNode = MAPPER.createObjectNode();
+            tokenNode.put("token", tokenResponse.get("access_token").asText());
+            tokenNode.put("created_at", System.currentTimeMillis() / 1000); // Current time in seconds
+            combined.set("token", tokenNode);
+        }
+
+        // Add user info under the user member
+        combined.set("user", userInfo);
+
+        return Response.ok(MAPPER.writeValueAsString(combined), MediaType.APPLICATION_JSON_TYPE).build();
     }
 }
