@@ -44,9 +44,23 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "fullScopeAllowed": true,
-      "defaultClientScopes": ["web-origins", "roles", "profile", "email"],
+      "defaultClientScopes": ["roles", "profile", "email"],
       "clientAuthenticatorType": "client-secret",
       "secret": "test-client-secret"
+    },
+    {
+      "clientId": "public-test-client",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["roles", "profile", "email", "bridge-legacy-auth"],
+      "clientAuthenticatorType": "client-secret",
+      "secret": "public-test-client-secret"
     }
   ],
   "roles": {
@@ -81,6 +95,14 @@
       "attributes": {
         "include.in.token.scope": "true",
         "display.on.consent.screen": "true"
+      }
+    },
+    {
+      "name": "bridge-legacy-auth",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
       }
     }
   ],

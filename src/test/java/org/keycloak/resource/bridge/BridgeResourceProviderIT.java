@@ -34,6 +34,7 @@ public class BridgeResourceProviderIT {
     private static final String TEST_REALM = "test-realm";
     private static final String TEST_USER = "test-user";
     private static final String TEST_PASSWORD = "test-password";
+    private static final String TEST_CLIENT_ID_STRING = "public-test-client";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final Network network = Network.newNetwork();
@@ -48,6 +49,9 @@ public class BridgeResourceProviderIT {
                     MountableFile.forHostPath("target/keycloak-postgresql-user-storage-spi-1.0.0-jar-with-dependencies.jar"),
                     "/opt/keycloak/providers/keycloak-postgresql-user-storage-spi-1.0.0-jar-with-dependencies.jar"
             )
+            // Set bridge client ID on bridge realm resource. The env one is commented out since effectively achieves the same
+            .withCustomCommand("--spi-realm-restapi-extension-bridge-client-id="+TEST_CLIENT_ID_STRING)
+            // .withEnv("KC_SPI_BRIDGE_CLIENT_ID", TEST_CLIENT_ID_STRING) // Set the client ID for the bridge
             .withEnv("KC_SPI_PROVIDERS", "classpath:/providers/")
             .withNetwork(network)
             .withNetworkAliases("keycloak")
@@ -109,6 +113,8 @@ public class BridgeResourceProviderIT {
         assertTrue(responseJson.has("refresh_token"), "Response should contain refresh_token");
         assertTrue(responseJson.has("token_type"), "Response should contain token_type");
         assertEquals("Bearer", responseJson.get("token_type").asText(), "Token type should be Bearer");
+        assertTrue(responseJson.has("expires_in"), "Response should contain expires_in");
+        assertTrue(responseJson.has("scope"), "Response should contain scope");
 
         // Assert the new response structure is present
         // Verify token object structure
@@ -134,6 +140,8 @@ public class BridgeResourceProviderIT {
 
         // Verify some expected user attributes from userinfo endpoint
         assertTrue(userNode.has("sub"), "user.sub should exist");
+        assertNotNull(userNode.get("sub").asText(), "user.sub should not be null");
+
         // Test user might have username set, which should match our test user
         if (userNode.has("preferred_username")) {
             assertEquals(TEST_USER, userNode.get("preferred_username").asText(),
@@ -197,6 +205,66 @@ public class BridgeResourceProviderIT {
         // Assert the response contains the expected error information
         assertTrue(responseJson.has("error"), "Response should contain error field");
         assertEquals("invalid_request", responseJson.get("error").asText(), "Error should be invalid_request");
+        assertTrue(responseJson.has("error_description"), "Response should contain error_description");
+        assertEquals("Missing credentials", responseJson.get("error_description").asText(),
+                "Error description should indicate missing credentials");
+    }
+
+    @Test
+    void testBridgeTokenEndpointWithMissingUsername() throws Exception {
+        // Build the bridge token endpoint URL
+        String bridgeEndpointUrl = keycloakContainer.getAuthServerUrl() + "/realms/" + TEST_REALM + "/bridge/token";
+
+        // Prepare incomplete credentials payload
+        Map<String, String> incompleteCredentials = new HashMap<>();
+        incompleteCredentials.put("password", TEST_PASSWORD);
+        // Missing username field
+
+        // Send request to the bridge token endpoint
+        WebTarget target = httpClient.target(bridgeEndpointUrl);
+        Response response = target
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .post(Entity.json(MAPPER.writeValueAsString(incompleteCredentials)));
+
+        // Assert the response has the expected error status
+        assertEquals(400, response.getStatus(), "Bridge token endpoint should return 400 for missing credentials");
+
+        // Parse the response body
+        String responseBody = response.readEntity(String.class);
+        JsonNode responseJson = MAPPER.readTree(responseBody);
+
+        // Assert the response contains the expected error information
+        assertTrue(responseJson.has("error"), "Response should contain error field");
+        assertEquals("invalid_request", responseJson.get("error").asText(), "Error should be invalid_request");
+        assertTrue(responseJson.has("error_description"), "Response should contain error_description");
+        assertEquals("Missing credentials", responseJson.get("error_description").asText(),
+                "Error description should indicate missing credentials");
+    }
+
+    @Test
+    void testBridgeTokenEndpointWithInvalidJson() throws Exception {
+        // Build the bridge token endpoint URL
+        String bridgeEndpointUrl = keycloakContainer.getAuthServerUrl() + "/realms/" + TEST_REALM + "/bridge/token";
+
+        // Send invalid JSON to the bridge token endpoint
+        WebTarget target = httpClient.target(bridgeEndpointUrl);
+        Response response = target
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .post(Entity.json("{invalid-json}"));
+
+        // Assert the response has the expected error status
+        assertEquals(400, response.getStatus(), "Bridge token endpoint should return 400 for invalid JSON");
+
+        // Parse the response body
+        String responseBody = response.readEntity(String.class);
+        JsonNode responseJson = MAPPER.readTree(responseBody);
+
+        // Assert the response contains the expected error information
+        assertTrue(responseJson.has("error"), "Response should contain error field");
+        assertEquals("invalid_request", responseJson.get("error").asText(), "Error should be invalid_request");
+        assertTrue(responseJson.has("error_description"), "Response should contain error_description");
+        assertEquals("Invalid JSON payload", responseJson.get("error_description").asText(),
+                "Error description should indicate invalid JSON");
     }
 
     private static void createTestUserIfNotExists() {

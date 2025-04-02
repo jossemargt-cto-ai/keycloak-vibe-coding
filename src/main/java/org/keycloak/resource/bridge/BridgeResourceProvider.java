@@ -27,7 +27,6 @@ import org.apache.http.util.EntityUtils;
 import org.jboss.logging.Logger;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.connections.httpclient.HttpClientProvider;
-import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.services.resource.RealmResourceProvider;
@@ -44,6 +43,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class BridgeResourceProvider implements RealmResourceProvider {
     private static final Logger LOG = Logger.getLogger(BridgeResourceProvider.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String USERINFO_REQ_SCOPES = "openid";
 
     private final KeycloakSession session;
     private final String clientId;
@@ -94,44 +94,22 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     public Response handleTokenRequest(String jsonBody, @Context HttpHeaders headers, @Context UriInfo uriInfo) {
         RealmModel realm = session.getContext().getRealm();
 
-        // Get client from configuration
-        String effectiveClientId = clientId != null ? clientId : "admin-cli";
-        LOG.debugf("Using client ID: %s for realm: %s", effectiveClientId, realm.getName());
+        // Verify that the client ID is not null (would happen if misconfigured in factory)
+        if (clientId == null) {
+            LOG.error("Bridge endpoint is misconfigured: No valid client ID specified");
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("{\"error\":\"server_error\",\"error_description\":\"initialization error\"}")
+                    .type(MediaType.APPLICATION_JSON_TYPE)
+                    .build();
+        }
 
         try {
-            // Parse JSON body
+            // Parse and process the credentials
             Credentials credentials = MAPPER.readValue(jsonBody, Credentials.class);
             if (credentials.getUsername() == null || credentials.getPassword() == null) {
                 LOG.warn("Missing username or password in request");
                 return Response.status(Response.Status.BAD_REQUEST)
                         .entity("{\"error\":\"invalid_request\",\"error_description\":\"Missing credentials\"}")
-                        .type(MediaType.APPLICATION_JSON_TYPE)
-                        .build();
-            }
-
-            // Verify client exists
-            ClientModel client = realm.getClientByClientId(effectiveClientId);
-            if (client == null) {
-                LOG.warnf("Client %s not found in realm %s", effectiveClientId, realm.getName());
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"error\":\"invalid_realm\",\"error_description\":\"Not supported\"}")
-                        .type(MediaType.APPLICATION_JSON_TYPE)
-                        .build();
-            }
-
-            if (!client.isEnabled()) {
-                LOG.warnf("Client %s is disabled in realm %s", effectiveClientId, realm.getName());
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"error\":\"invalid_client\",\"error_description\":\"Client disabled\"}")
-                        .type(MediaType.APPLICATION_JSON_TYPE)
-                        .build();
-            }
-
-            // Check if direct grants are allowed for client
-            if (!client.isDirectAccessGrantsEnabled()) {
-                LOG.warnf("Client %s does not have direct grants enabled", effectiveClientId);
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity("{\"error\":\"invalid_client\",\"error_description\":\"Client not enabled for direct grants\"}")
                         .type(MediaType.APPLICATION_JSON_TYPE)
                         .build();
             }
@@ -143,8 +121,8 @@ public class BridgeResourceProvider implements RealmResourceProvider {
             // Prepare form parameters for OIDC token request
             Map<String, String> formParams = new HashMap<>();
             formParams.put(OAuth2Constants.GRANT_TYPE, OAuth2Constants.PASSWORD);
-            formParams.put(OAuth2Constants.CLIENT_ID, effectiveClientId);
-            formParams.put(OAuth2Constants.SCOPE, "openid"); // Add openid scope to properly identify as an OIDC request
+            formParams.put(OAuth2Constants.CLIENT_ID, clientId);
+            formParams.put(OAuth2Constants.SCOPE, USERINFO_REQ_SCOPES);
             formParams.put("username", credentials.getUsername());
             formParams.put("password", credentials.getPassword());
 
