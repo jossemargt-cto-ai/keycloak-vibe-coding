@@ -1,4 +1,4 @@
-package org.keycloak.resource.bridge;
+package org.keycloak.realmresource.bridge;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;

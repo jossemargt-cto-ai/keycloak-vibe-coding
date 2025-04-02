@@ -1,4 +1,4 @@
-package org.keycloak.resource.bridge;
+package org.keycloak.realmresource.bridge;
 
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import org.junit.jupiter.api.AfterAll;

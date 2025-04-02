@@ -1,4 +1,4 @@
-package org.keycloak.resource.bridge;
+package org.keycloak.realmresource.bridge;
 
 import org.jboss.logging.Logger;
 import org.keycloak.Config.Scope;
