@@ -108,22 +108,25 @@ public class BridgeResourceProviderIT {
         String responseBody = response.readEntity(String.class);
         JsonNode responseJson = MAPPER.readTree(responseBody);
 
-        // Assert the response contains expected OAuth tokens (legacy format still maintained)
-        assertTrue(responseJson.has("access_token"), "Response should contain access_token");
-        assertTrue(responseJson.has("refresh_token"), "Response should contain refresh_token");
-        assertTrue(responseJson.has("token_type"), "Response should contain token_type");
-        assertEquals("Bearer", responseJson.get("token_type").asText(), "Token type should be Bearer");
-        assertTrue(responseJson.has("expires_in"), "Response should contain expires_in");
-        assertTrue(responseJson.has("scope"), "Response should contain scope");
-
-        // Assert the new response structure is present
-        // Verify token object structure
+        // Verify that the response has exactly two root members: "user" and "token"
+        assertEquals(2, responseJson.size(), "Response should have exactly two root members");
+        assertTrue(responseJson.has("user"), "Response should contain user object");
         assertTrue(responseJson.has("token"), "Response should contain token object");
+
+        // Verify token object structure
         JsonNode tokenNode = responseJson.get("token");
         assertTrue(tokenNode.isObject(), "token should be an object");
+
+        // Verify token.token exists (remapped from access_token)
         assertTrue(tokenNode.has("token"), "token.token should exist");
-        assertEquals(responseJson.get("access_token").asText(), tokenNode.get("token").asText(),
-                "token.token should match access_token");
+        assertNotNull(tokenNode.get("token").asText(), "token.token should not be null");
+
+        // Verify other token-related fields are under the token object
+        assertTrue(tokenNode.has("refresh_token"), "token.refresh_token should exist");
+        assertTrue(tokenNode.has("token_type"), "token.token_type should exist");
+        assertEquals("Bearer", tokenNode.get("token_type").asText(), "Token type should be Bearer");
+        assertTrue(tokenNode.has("expires_in"), "token.expires_in should exist");
+        assertTrue(tokenNode.has("scope"), "token.scope should exist");
 
         // Verify creation timestamp
         assertTrue(tokenNode.has("created_at"), "token.created_at should exist");
@@ -134,7 +137,6 @@ public class BridgeResourceProviderIT {
         assertTrue(createdAt > currentTime - 60, "created_at should be recent (within last minute)");
 
         // Verify user object
-        assertTrue(responseJson.has("user"), "Response should contain user object");
         JsonNode userNode = responseJson.get("user");
         assertTrue(userNode.isObject(), "user should be an object");
 
@@ -147,6 +149,9 @@ public class BridgeResourceProviderIT {
             assertEquals(TEST_USER, userNode.get("preferred_username").asText(),
                     "preferred_username should match test user");
         }
+
+        // Ensure access_token is no longer at the root level
+        assertFalse(responseJson.has("access_token"), "access_token should not be at the root level");
     }
 
     @Test

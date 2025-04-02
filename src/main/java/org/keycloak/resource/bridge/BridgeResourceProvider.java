@@ -284,25 +284,35 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     }
 
     /**
-     * Create a combined response with both token data and user info
+     * Create a combined response with both token data and user info in a single JSON object.
+     *
+     * This is required to comply with the legacy clients that expect a specific format/contract.
      */
     private Response createCombinedResponse(JsonNode tokenResponse, JsonNode userInfo) throws IOException {
-        // Create our new response structure
+        // Create our new response structure with only two root nodes: token and user
         ObjectNode combined = MAPPER.createObjectNode();
 
-        // Add all token fields from the original response
+        // Create the token object that will contain all token-related fields
+        ObjectNode tokenNode = MAPPER.createObjectNode();
+
+        // Add all token fields from the original response to the token node
         tokenResponse.fieldNames().forEachRemaining(fieldName -> {
-            combined.set(fieldName, tokenResponse.get(fieldName));
+            // Skip access_token as we'll add it specifically as "token"
+            if (!fieldName.equals("access_token")) {
+                tokenNode.set(fieldName, tokenResponse.get(fieldName));
+            }
         });
 
-        // Extract the access token to its own member
+        // Add the access_token as "token" in the token node
         if (tokenResponse.has("access_token")) {
-            // Create a token object with the access_token under "token" field and add creation timestamp
-            ObjectNode tokenNode = MAPPER.createObjectNode();
             tokenNode.put("token", tokenResponse.get("access_token").asText());
-            tokenNode.put("created_at", System.currentTimeMillis() / 1000); // Current time in seconds
-            combined.set("token", tokenNode);
         }
+
+        // Add creation timestamp to the token node
+        tokenNode.put("created_at", System.currentTimeMillis() / 1000); // Current time in seconds
+
+        // Add the token node to the combined response
+        combined.set("token", tokenNode);
 
         // Add user info under the user member
         combined.set("user", userInfo);
