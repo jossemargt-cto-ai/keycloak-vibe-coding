@@ -13,11 +13,11 @@ public class PostgreSQLUserModel {
     public static final String FIELD_EMAIL_VERIFIED = "email_verified";
     public static final String FIELD_FIRST_NAME = "first_name";
     public static final String FIELD_LAST_NAME = "last_name";
-    public static final String FIELD_DISABLED = "disabled";
-    public static final String FIELD_PASSWORD_DIGEST = "password_digest";
+    public static final String FIELD_DISABLED = "disabled"; // actually it is "enabled" in Keycloak
 
     // Constants for additional fields
     public static final String FIELD_ID = "id";
+    public static final String FIELD_PASSWORD_DIGEST = "password_digest";
     public static final String FIELD_BUSINESS_NAME = "business_name";
     public static final String FIELD_BUSINESS_TYPE = "business_type";
     public static final String FIELD_BUSINESS_USER = "business_user";

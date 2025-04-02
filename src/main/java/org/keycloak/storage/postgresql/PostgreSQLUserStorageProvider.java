@@ -169,7 +169,7 @@ public class PostgreSQLUserStorageProvider implements
         boolean isLocalUser = localUser != null && localUser.getId().equals(user.getId());
         if (!isLocalUser && user instanceof PostgreSQLUserAdapter) {
             PostgreSQLUserAdapter adapter = (PostgreSQLUserAdapter) user;
-            localUser = importUser(realm, adapter.getPostgreSQLUserModel());
+            localUser = importUser(realm, adapter);
             storeUserCredentials(realm, localUser, plainPassword);
             logger.info("User imported to Keycloak database: " + user.getEmail());
         }
@@ -193,17 +193,14 @@ public class PostgreSQLUserStorageProvider implements
     /**
      * Centralized method to handle user import logic
      */
-    private UserModel importUser(RealmModel realm, PostgreSQLUserModel pgUser) {
-        logger.info("Importing user from PostgreSQL: " + pgUser.getEmail());
-
-        // Use email as the username since that's what the database uses
-        UserModel imported = session.users().addUser(realm, pgUser.getEmail());
-        imported.setFederationLink(model.getId());
-        imported.setEnabled(!pgUser.isDisabled());
-        imported.setEmail(pgUser.getEmail());
-        imported.setEmailVerified(pgUser.isEmailVerified());
-        imported.setFirstName(pgUser.getFirstName());
-        imported.setLastName(pgUser.getLastName());
+    private UserModel importUser(RealmModel realm, PostgreSQLUserAdapter adapter) {
+        UserModel imported = session.users().addUser(realm, adapter.getEmail());
+        imported.setFederationLink(model.getId()); // Set federation link so Keycloak can determine origin/ownership upon sync
+        imported.setEnabled(adapter.isEnabled());
+        imported.setEmail(adapter.getEmail());
+        imported.setEmailVerified(adapter.isEmailVerified());
+        imported.setFirstName(adapter.getFirstName());
+        imported.setLastName(adapter.getLastName());
 
         // Clear all required actions that might be set by default
         imported.getRequiredActionsStream().forEach(action -> {
@@ -211,22 +208,12 @@ public class PostgreSQLUserStorageProvider implements
             logger.debug("Removed required action '" + action + "' for imported user: " + imported.getUsername());
         });
 
-        // Dynamically map remaining columns as attributes with the FED_ prefix
-        Map<String, String> attributes = pgUser.getAttributes();
-        if (attributes != null) {
-            attributes.forEach((key, value) -> {
-                if (value != null && !List.of(
-                    PostgreSQLUserModel.FIELD_EMAIL,
-                    PostgreSQLUserModel.FIELD_EMAIL_VERIFIED,
-                    PostgreSQLUserModel.FIELD_FIRST_NAME,
-                    PostgreSQLUserModel.FIELD_LAST_NAME,
-                    PostgreSQLUserModel.FIELD_DISABLED
-                ).contains(key)) {
-                    // TODO: do we truly need to prefix with FED_?
-                    imported.setSingleAttribute("FED_" + key.toUpperCase(), value);
-                }
-            });
-        }
+        // Import all attributes from the adapter - this will have the prefixes already applied
+        adapter.getAttributes().forEach((key, values) -> {
+            if (values != null && !values.isEmpty()) {
+                imported.setAttribute(key, values);
+            }
+        });
 
         return imported;
     }

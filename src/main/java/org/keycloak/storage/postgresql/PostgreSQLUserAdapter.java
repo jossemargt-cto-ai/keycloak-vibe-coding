@@ -18,6 +18,11 @@ import java.util.stream.Stream;
  */
 public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
+    /**
+     * Prefix used for all federation attributes when mapping from PostgreSQL to Keycloak
+     */
+    public static final String FEDERATION_ATTRIBUTE_PREFIX = "FED_";
+
     private final PostgreSQLUserModel pgUser;
     private final String keycloakId;
     private final SubjectCredentialManager credentialManager;
@@ -28,7 +33,8 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
             PostgreSQLUserModel.FIELD_EMAIL_VERIFIED,
             PostgreSQLUserModel.FIELD_FIRST_NAME,
             PostgreSQLUserModel.FIELD_LAST_NAME,
-            PostgreSQLUserModel.FIELD_DISABLED
+            PostgreSQLUserModel.FIELD_DISABLED, // Indirectly mapped
+            PostgreSQLUserModel.FIELD_PASSWORD_DIGEST // Indirectly mapped
     );
 
     public PostgreSQLUserAdapter(KeycloakSession session, RealmModel realm,
@@ -139,16 +145,15 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
         Map<String, String> attributes = pgUser.getAttributes();
         Map<String, List<String>> result = super.getAttributes();
 
-        // Add all the attributes from the PostgreSQL user with the FED_ prefix
+        // Add all the attributes from the PostgreSQL user with the federation prefix
         // Skip the directly mapped fields
         for (Map.Entry<String, String> entry : attributes.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
 
             if (value != null && !MAPPED_FIELDS.contains(key)) {
-                // TODO: do we truly need to prefix with FED_?
                 // TODO: Handle multiple values
-                result.put("FED_" + key.toUpperCase(), Collections.singletonList(value));
+                result.put(FEDERATION_ATTRIBUTE_PREFIX + key.toUpperCase(), Collections.singletonList(value));
             }
         }
 
@@ -163,8 +168,8 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
         }
 
         // Check if it's one of our prefixed attributes
-        if (name.startsWith("FED_")) {
-            String dbFieldName = name.substring(4).toLowerCase(); // Remove the FED_ prefix and convert to lowercase
+        if (name.startsWith(FEDERATION_ATTRIBUTE_PREFIX)) {
+            String dbFieldName = name.substring(FEDERATION_ATTRIBUTE_PREFIX.length()).toLowerCase(); // Remove the prefix and convert to lowercase
             String value = pgUser.getAttribute(dbFieldName);
             return value != null ? Stream.of(value) : Stream.empty();
         }
