@@ -28,13 +28,21 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
     private final SubjectCredentialManager credentialManager;
 
     // List of fields that are directly mapped to Keycloak model
-    private static final List<String> MAPPED_FIELDS = List.of(
+    private static final List<String> IGNORE_FIELDS = List.of(
+            // Directly mapped by Keycloak
             PostgreSQLUserModel.FIELD_EMAIL,
             PostgreSQLUserModel.FIELD_EMAIL_VERIFIED,
             PostgreSQLUserModel.FIELD_FIRST_NAME,
             PostgreSQLUserModel.FIELD_LAST_NAME,
-            PostgreSQLUserModel.FIELD_DISABLED, // Indirectly mapped
-            PostgreSQLUserModel.FIELD_PASSWORD_DIGEST // Indirectly mapped
+            // Indirectly mapped by Keycloak through federation
+            PostgreSQLUserModel.FIELD_DISABLED,
+            PostgreSQLUserModel.FIELD_PASSWORD_DIGEST,
+            // Fields that we don't need to track
+            PostgreSQLUserModel.FIELD_CONFIRMATION_TOKEN,
+            PostgreSQLUserModel.FIELD_LAST_LOGIN_AT,
+            PostgreSQLUserModel.FIELD_RESET_PASSWORD_TOKEN,
+            PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT,
+            PostgreSQLUserModel.FIELD_UPDATED_AT
     );
 
     public PostgreSQLUserAdapter(KeycloakSession session, RealmModel realm,
@@ -151,7 +159,7 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
             String key = entry.getKey();
             String value = entry.getValue();
 
-            if (value != null && !MAPPED_FIELDS.contains(key)) {
+            if (value != null && !IGNORE_FIELDS.contains(key)) {
                 // TODO: Handle multiple values
                 result.put(FEDERATION_ATTRIBUTE_PREFIX + key.toUpperCase(), Collections.singletonList(value));
             }

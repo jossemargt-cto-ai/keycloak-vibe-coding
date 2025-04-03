@@ -215,6 +215,8 @@ public class PostgreSQLUserStorageProvider implements
             }
         });
 
+        imported.setSingleAttribute("origin", model.getId());
+
         return imported;
     }
 
