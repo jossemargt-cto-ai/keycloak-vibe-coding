@@ -3,6 +3,7 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
   "requiredActions": [
     {
       "alias": "VERIFY_EMAIL",
@@ -106,5 +107,29 @@
       }
     }
   ],
-  "defaultDefaultClientScopes": ["roles", "profile", "email", "web-origins"]
+  "defaultDefaultClientScopes": ["roles", "profile", "email"],
+  "users": [
+    {
+      "username": "bridge-test@example.com",
+      "email": "bridge-test@example.com",
+      "firstName": "Bridge",
+      "lastName": "Test",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test-password",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "FED_BUSINESS_NAME": ["Test Business"],
+        "FED_USER_CODE": ["USER123"],
+        "FED_BUSINESS_TYPE": ["Corporation"],
+        "FED_ROLE": ["admin"],
+        "origin": ["postgresql-user-storage"]
+      }
+    }
+  ]
 }
