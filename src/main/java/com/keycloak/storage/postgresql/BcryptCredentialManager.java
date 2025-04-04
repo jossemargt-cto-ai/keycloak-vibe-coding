@@ -1,4 +1,4 @@
-package org.keycloak.storage.postgresql;
+package com.keycloak.storage.postgresql;
 
 import org.keycloak.credential.*;
 import org.keycloak.models.SubjectCredentialManager;

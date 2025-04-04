@@ -1,1 +1,1 @@
-org.keycloak.realmresource.bridge.BridgeResourceProviderFactory
+com.keycloak.endpoint.bridge.BridgeResourceProviderFactory

@@ -1,4 +1,4 @@
-package org.keycloak.storage.postgresql;
+package com.keycloak.storage.postgresql;
 
 import java.util.HashMap;
 import java.util.Map;

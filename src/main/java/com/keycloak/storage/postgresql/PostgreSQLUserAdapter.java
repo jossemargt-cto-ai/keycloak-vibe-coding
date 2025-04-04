@@ -1,4 +1,4 @@
-package org.keycloak.storage.postgresql;
+package com.keycloak.storage.postgresql;
 
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.KeycloakSession;

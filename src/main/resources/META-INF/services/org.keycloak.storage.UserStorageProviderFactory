@@ -1,1 +1,1 @@
-org.keycloak.storage.postgresql.PostgreSQLUserStorageProviderFactory
+com.keycloak.storage.postgresql.PostgreSQLUserStorageProviderFactory

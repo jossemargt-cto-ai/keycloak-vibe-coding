@@ -1,4 +1,4 @@
-package org.keycloak.storage.postgresql;
+package com.keycloak.storage.postgresql;
 
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import org.junit.jupiter.api.AfterAll;
@@ -55,8 +55,8 @@ public class PostgreSQLUserStorageProviderIT {
             .withAdminPassword("tops3cr3t")
             .withRealmImportFile("test-realm.json")
             .withCopyFileToContainer(
-                    MountableFile.forHostPath("target/keycloak-postgresql-user-storage-spi-1.0.0-jar-with-dependencies.jar"),
-                    "/opt/keycloak/providers/keycloak-postgresql-user-storage-spi-1.0.0-jar-with-dependencies.jar"
+                    MountableFile.forHostPath("target/keycloak-bridge-spis-1.0.0-jar-with-dependencies.jar"),
+                    "/opt/keycloak/providers/keycloak-bridge-spis-1.0.0-jar-with-dependencies.jar"
             )
             .withEnv("KC_SPI_PROVIDERS", "classpath:/providers/")
             .withNetwork(SHARED_NETWORK)

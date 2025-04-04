@@ -1,4 +1,4 @@
-package org.keycloak.mapper;
+package com.keycloak.mapper;
 
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.KeycloakSession;
@@ -11,8 +11,9 @@ import org.keycloak.protocol.oidc.mappers.OIDCIDTokenMapper;
 import org.keycloak.protocol.oidc.mappers.UserInfoTokenMapper;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.representations.IDToken;
-import org.keycloak.storage.postgresql.PostgreSQLUserAdapter;
-import org.keycloak.storage.postgresql.PostgreSQLUserModel;
+
+import com.keycloak.storage.postgresql.PostgreSQLUserAdapter;
+import com.keycloak.storage.postgresql.PostgreSQLUserModel;
 
 import java.util.ArrayList;
 import java.util.List;
