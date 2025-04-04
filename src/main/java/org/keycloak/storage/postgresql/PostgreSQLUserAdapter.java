@@ -27,7 +27,6 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
     private final String keycloakId;
     private final SubjectCredentialManager credentialManager;
 
-    // List of fields that are directly mapped to Keycloak model
     private static final List<String> IGNORE_FIELDS = List.of(
             // Directly mapped by Keycloak
             PostgreSQLUserModel.FIELD_EMAIL,
@@ -52,7 +51,6 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
         super(session, realm, storageProviderModel);
         this.pgUser = pgUser;
         this.credentialManager = credentialManager;
-        // Use the UUID from database as the external ID for the StorageId
         this.keycloakId = StorageId.keycloakId(storageProviderModel, pgUser.getId());
     }
 
@@ -154,7 +152,6 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
         Map<String, List<String>> result = super.getAttributes();
 
         // Add all the attributes from the PostgreSQL user with the federation prefix
-        // Skip the directly mapped fields
         for (Map.Entry<String, String> entry : attributes.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();

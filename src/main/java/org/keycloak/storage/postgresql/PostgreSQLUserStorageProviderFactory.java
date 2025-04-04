@@ -23,24 +23,17 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
 
     public static final String PROVIDER_ID = "postgresql-user-storage";
 
-    // Configuration properties (enables Admin UI overrides)
     public static final String JDBC_URL = "jdbcUrl";
     public static final String DB_USERNAME = "username";
     public static final String DB_PASSWORD = "password";
     public static final String IMPORT_USERS = "importUsers";
 
-    // Non-overridable configuration properties (fixed values)
-    public static final String USERS_TABLE = "usersTable";
-
-    // Default values (extracted from Legacy's database)
-    private static final String DEFAULT_USERS_TABLE = "users";
-
+    private static final String USERS_TABLE_NAME = "users";
     private static final Logger logger = LoggerFactory.getLogger(PostgreSQLUserStorageProviderFactory.class);
 
     protected static final List<ProviderConfigProperty> configMetadata;
 
     static {
-        // Configure the provider configuration properties
         configMetadata = ProviderConfigurationBuilder.create()
             .property()
                 .name(JDBC_URL)
@@ -86,12 +79,10 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
 
     @Override
     public void validateConfiguration(KeycloakSession session, RealmModel realm, ComponentModel config) throws ComponentValidationException {
-        // Get the configured JDBC URL, username, and password
         String jdbcUrl = config.getConfig().getFirst(JDBC_URL);
         String username = config.getConfig().getFirst(DB_USERNAME);
         String password = config.getConfig().getFirst(DB_PASSWORD);
 
-        // Validate that required properties are provided
         if (jdbcUrl == null || jdbcUrl.trim().isEmpty()) {
             throw new ComponentValidationException("JDBC URL is required");
         }
@@ -123,7 +114,6 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
 
     @Override
     public void init(Config.Scope config) {
-        // Load the PostgreSQL JDBC driver
         try {
             Class.forName("org.postgresql.Driver");
             logger.info("PostgreSQL JDBC driver loaded successfully");
@@ -148,14 +138,11 @@ public class PostgreSQLUserStorageProviderFactory implements UserStorageProvider
         String username = config.getConfig().getFirst(DB_USERNAME);
         String password = config.getConfig().getFirst(DB_PASSWORD);
 
-        // Use fixed values for table name
-        String usersTable = DEFAULT_USERS_TABLE;
-
         return new PostgreSQLConnectionManager(
             jdbcUrl,
             username,
             password,
-            usersTable
+            USERS_TABLE_NAME
         );
     }
 }

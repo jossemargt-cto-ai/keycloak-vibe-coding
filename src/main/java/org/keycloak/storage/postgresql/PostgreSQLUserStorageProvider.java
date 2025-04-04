@@ -42,16 +42,13 @@ public class PostgreSQLUserStorageProvider implements
         this.importUsers = importUsers;
     }
 
-    // UserStorageProvider methods
     @Override
     public void close() {
-        // No resources to clean up
+        // NO-OP
     }
 
-    // UserLookupProvider methods
     @Override
     public UserModel getUserById(RealmModel realm, String id) {
-        // The ID could be a StorageId for federated users or a direct UUID
         String externalId = StorageId.externalId(id);
         PostgreSQLUserModel pgUser = connectionManager.getUserById(externalId);
         if (pgUser != null) {
@@ -62,7 +59,6 @@ public class PostgreSQLUserStorageProvider implements
 
     @Override
     public UserModel getUserByUsername(RealmModel realm, String username) {
-        // Since email is used as username, we can use the email lookup method
         return getUserByEmail(realm, username);
     }
 
@@ -75,7 +71,6 @@ public class PostgreSQLUserStorageProvider implements
         return null;
     }
 
-    // UserQueryProvider methods
     @Override
     public Stream<UserModel> searchForUserStream(RealmModel realm, String search, Integer firstResult, Integer maxResults) {
         return searchForUserStream(realm, Map.of(UserModel.SEARCH, search), firstResult, maxResults);
@@ -90,7 +85,6 @@ public class PostgreSQLUserStorageProvider implements
 
         String usernameSearch = params.get(UserModel.USERNAME);
         if (usernameSearch != null) {
-            // Since email is username, search by email
             List<PostgreSQLUserModel> users = connectionManager.searchForUserByUserAttribute("email", usernameSearch, maxResults != null ? maxResults : 100);
             return mapToUserModelStream(realm, users);
         }
@@ -113,25 +107,22 @@ public class PostgreSQLUserStorageProvider implements
             return mapToUserModelStream(realm, users);
         }
 
-        // Default search across multiple fields
-        // Only need to search by email since that's being used as username
         List<PostgreSQLUserModel> usersByEmail = connectionManager.searchForUserByUserAttribute("email", search, maxResults != null ? maxResults : 100);
         return mapToUserModelStream(realm, usersByEmail);
     }
 
     @Override
     public Stream<UserModel> getGroupMembersStream(RealmModel realm, GroupModel group, Integer firstResult, Integer maxResults) {
-        // Not implemented for read-only federation
+        // TODO: Implement group membership handling
         return Stream.empty();
     }
 
     @Override
     public Stream<UserModel> searchForUserByUserAttributeStream(RealmModel realm, String attrName, String attrValue) {
-        // Not implemented for read-only federation
+        // TODO: Not implemented yet
         return Stream.empty();
     }
 
-    // CredentialInputValidator methods
     @Override
     public boolean supportsCredentialType(String credentialType) {
         return PasswordCredentialModel.TYPE.equals(credentialType);
@@ -151,20 +142,17 @@ public class PostgreSQLUserStorageProvider implements
         String plainPassword = input.getChallengeResponse();
         String storedPasswordHash = connectionManager.getPasswordHash(user.getEmail());
 
-        // Use the centralized password validation logic from BcryptCredentialManager
         boolean isValid = BcryptCredentialManager.validatePassword(plainPassword, storedPasswordHash);
 
         if (!isValid || !importUsers) {
             return isValid;
         }
 
-        // Check if dealing with a federated user handle by this provider
         String federationLink = user.getFederationLink();
         if (federationLink == null || !federationLink.equals(model.getId())) {
             return true;
         }
 
-        // Import federated user and store credentials using Keycloak's hash algorithms
         UserModel localUser = session.users().getUserByEmail(realm, user.getEmail());
         boolean isLocalUser = localUser != null && localUser.getId().equals(user.getId());
         if (!isLocalUser && user instanceof PostgreSQLUserAdapter) {
@@ -177,7 +165,6 @@ public class PostgreSQLUserStorageProvider implements
         return true;
     }
 
-    // Helper methods
     private Stream<UserModel> getAll(RealmModel realm, Integer firstResult, Integer maxResults) {
         List<PostgreSQLUserModel> users = connectionManager.getAllUsers(
                 firstResult != null ? firstResult : 0,

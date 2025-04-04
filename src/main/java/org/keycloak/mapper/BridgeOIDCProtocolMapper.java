@@ -93,7 +93,6 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper impleme
      * Checks if the given field name corresponds to a constant field in PostgreSQLUserModel
      */
     private boolean isFieldConstant(String fieldName) {
-        // Check if the field name matches any of the constants in PostgreSQLUserModel
         return fieldName.equals(PostgreSQLUserModel.FIELD_ID) ||
                fieldName.equals(PostgreSQLUserModel.FIELD_BUSINESS_NAME) ||
                fieldName.equals(PostgreSQLUserModel.FIELD_BUSINESS_TYPE) ||
@@ -117,7 +116,6 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper impleme
      * Checks if the given field name is in the IGNORE_FIELDS list of PostgreSQLUserAdapter
      */
     private boolean isIgnoredField(String fieldName) {
-        // These fields match the ones in IGNORE_FIELDS in PostgreSQLUserAdapter
         return fieldName.equals(PostgreSQLUserModel.FIELD_EMAIL) ||
                fieldName.equals(PostgreSQLUserModel.FIELD_EMAIL_VERIFIED) ||
                fieldName.equals(PostgreSQLUserModel.FIELD_FIRST_NAME) ||

@@ -2,6 +2,7 @@ package org.keycloak.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -110,17 +111,19 @@ public class BridgeOIDCProtocolMapperIT {
         IDToken token = verifier.getToken();
 
         // Verify the expected claims
-        assertTrue(token.getOtherClaims().get("businessName") != null, "businessName claim should be present");
+        assertNotNull(token.getOtherClaims().get("businessName"), "businessName claim should be present");
         assertEquals(TEST_BUSINESS_NAME, token.getOtherClaims().get("businessName").toString());
 
-        assertTrue(token.getOtherClaims().get("userCode")  != null, "userCode claim should be present");
+        assertNotNull(token.getOtherClaims().get("userCode") , "userCode claim should be present");
         assertEquals(TEST_USER_CODE, token.getOtherClaims().get("userCode").toString());
 
-        assertTrue(token.getOtherClaims().get("businessType")  != null, "businessType claim should be present");
+        assertNotNull(token.getOtherClaims().get("businessType") , "businessType claim should be present");
         assertEquals(TEST_BUSINESS_TYPE, token.getOtherClaims().get("businessType").toString());
 
-        assertTrue(token.getOtherClaims().get("role")  != null, "role claim should be present");
+        assertNotNull(token.getOtherClaims().get("role") , "role claim should be present");
         assertEquals(TEST_ROLE, token.getOtherClaims().get("role").toString());
+
+        assertNull(token.getOtherClaims().get("origin"), "origin claim should not be present, doesn't have the FED prefix");
     }
 
     @Test
@@ -156,6 +159,8 @@ public class BridgeOIDCProtocolMapperIT {
 
         assertTrue(userInfoJson.has("role"), "role claim should be present");
         assertEquals(TEST_ROLE, userInfoJson.get("role").asText());
+
+        assertTrue(!userInfoJson.has("origin"), "origin claim should not be present, doesn't have the FED prefix");
     }
 
     /**

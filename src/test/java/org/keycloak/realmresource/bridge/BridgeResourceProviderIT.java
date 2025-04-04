@@ -180,7 +180,7 @@ public class BridgeResourceProviderIT {
         // Assert the response contains the expected error information
         assertTrue(responseJson.has("error"), "Response should contain error field");
 
-        // TODO: It should be "invalid_credential" but this is how it comes from the OIDC endpoint. It will be fixed in the future.
+        // TODO: It should be "invalid_credential" but this is how it comes from the OIDC endpoint. It will be addressed post-POC phase.
         assertEquals("invalid_grant", responseJson.get("error").asText(), "Error should be invalid_grant");
     }
 
@@ -246,6 +246,9 @@ public class BridgeResourceProviderIT {
                 "Error description should indicate missing credentials");
     }
 
+    // This by design will throw an exception Keycloak side, so don't worry about it. It should see like something among the lines of:
+    //
+    // com.fasterxml.jackson.core.JsonParseException: Unexpected character ('i' (code 105)): was expecting double-quote to start field name
     @Test
     void testBridgeTokenEndpointWithInvalidJson() throws Exception {
         // Build the bridge token endpoint URL

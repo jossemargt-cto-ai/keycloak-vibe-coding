@@ -26,9 +26,11 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.jboss.logging.Logger;
 import org.keycloak.OAuth2Constants;
+import org.keycloak.TokenVerifier;
 import org.keycloak.connections.httpclient.HttpClientProvider;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.representations.IDToken;
 import org.keycloak.services.resource.RealmResourceProvider;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -43,7 +45,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class BridgeResourceProvider implements RealmResourceProvider {
     private static final Logger LOG = Logger.getLogger(BridgeResourceProvider.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String USERINFO_REQ_SCOPES = "openid";
+    private static final String USERINFO_REQ_SCOPES = "openid email profile";
 
     private final KeycloakSession session;
     private final String clientId;
@@ -94,7 +96,7 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     public Response handleTokenRequest(String jsonBody, @Context HttpHeaders headers, @Context UriInfo uriInfo) {
         RealmModel realm = session.getContext().getRealm();
 
-        // Verify that the client ID is not null (would happen if misconfigured in factory)
+        // clientid will be null upon misconfiguration, see Factory for more context
         if (clientId == null) {
             LOG.error("Bridge endpoint is misconfigured: No valid client ID specified");
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
@@ -104,7 +106,6 @@ public class BridgeResourceProvider implements RealmResourceProvider {
         }
 
         try {
-            // Parse and process the credentials
             Credentials credentials = MAPPER.readValue(jsonBody, Credentials.class);
             if (credentials.getUsername() == null || credentials.getPassword() == null) {
                 LOG.warn("Missing username or password in request");
@@ -114,11 +115,9 @@ public class BridgeResourceProvider implements RealmResourceProvider {
                         .build();
             }
 
-            // Build the token endpoint URL for the realm
             String tokenEndpointUrl = buildTokenEndpointUrl(uriInfo, realm);
             LOG.debugf("Using token endpoint URL: %s", tokenEndpointUrl);
 
-            // Prepare form parameters for OIDC token request
             Map<String, String> formParams = new HashMap<>();
             formParams.put(OAuth2Constants.GRANT_TYPE, OAuth2Constants.PASSWORD);
             formParams.put(OAuth2Constants.CLIENT_ID, clientId);
@@ -126,7 +125,6 @@ public class BridgeResourceProvider implements RealmResourceProvider {
             formParams.put("username", credentials.getUsername());
             formParams.put("password", credentials.getPassword());
 
-            // Forward the request to the token endpoint and return the response
             return forwardTokenRequest(tokenEndpointUrl, formParams);
 
         } catch (IOException e) {
@@ -151,26 +149,12 @@ public class BridgeResourceProvider implements RealmResourceProvider {
      * Build the URL for the token endpoint in the current realm
      */
     private String buildTokenEndpointUrl(UriInfo uriInfo, RealmModel realm) {
-        // Use the KeycloakSession's context to get the correct base URL that respects Keycloak's configuration
         String authServerBaseUrl = uriInfo.getBaseUri().toString();
         if (authServerBaseUrl.endsWith("/")) {
             authServerBaseUrl = authServerBaseUrl.substring(0, authServerBaseUrl.length() - 1);
         }
 
         return authServerBaseUrl + "/realms/" + realm.getName() + "/protocol/openid-connect/token";
-    }
-
-    /**
-     * Build the URL for the userinfo endpoint in the current realm
-     */
-    private String buildUserInfoEndpointUrl(UriInfo uriInfo, RealmModel realm) {
-        // Use the KeycloakSession's context to get the correct base URL that respects Keycloak's configuration
-        String authServerBaseUrl = uriInfo.getBaseUri().toString();
-        if (authServerBaseUrl.endsWith("/")) {
-            authServerBaseUrl = authServerBaseUrl.substring(0, authServerBaseUrl.length() - 1);
-        }
-
-        return authServerBaseUrl + "/realms/" + realm.getName() + "/protocol/openid-connect/userinfo";
     }
 
     /**
@@ -187,19 +171,16 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     }
 
     /**
-     * Forward the token request to the OIDC token endpoint, then get user info, and return combined response
+     * Forward the token request to the OIDC token endpoint, extract user info from ID token,
+     * and return combined response
      */
     private Response forwardTokenRequest(String tokenEndpointUrl, Map<String, String> formParams) throws IOException {
         LOG.debug("Forwarding token request to: " + tokenEndpointUrl);
 
-        // Get the HttpClient from Keycloak's HttpClientProvider
         CloseableHttpClient httpClient = session.getProvider(HttpClientProvider.class).getHttpClient();
-
-        // Create POST request to token endpoint
         HttpPost httpPost = new HttpPost(tokenEndpointUrl);
-        httpPost.setHeader("Content-Type", "application/x-www-form-urlencoded");
 
-        // Build form URL encoded body
+        httpPost.setHeader("Content-Type", "application/x-www-form-urlencoded");
         StringBuilder formBody = new StringBuilder();
         for (Map.Entry<String, String> param : formParams.entrySet()) {
             if (formBody.length() > 0) {
@@ -209,19 +190,13 @@ public class BridgeResourceProvider implements RealmResourceProvider {
                    .append("=")
                    .append(encodeFormParameter(param.getValue()));
         }
-
-        // Set request entity
         httpPost.setEntity(new StringEntity(formBody.toString(), ContentType.APPLICATION_FORM_URLENCODED));
 
-        // Execute request
-        try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-            // Get response status
-            int statusCode = response.getStatusLine().getStatusCode();
 
-            // Get response body
+        try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+            int statusCode = response.getStatusLine().getStatusCode();
             String responseBody = EntityUtils.toString(response.getEntity());
 
-            // If the token request was not successful, just return the error response
             if (statusCode != 200) {
                 return Response.status(statusCode)
                         .entity(responseBody)
@@ -229,57 +204,88 @@ public class BridgeResourceProvider implements RealmResourceProvider {
                         .build();
             }
 
-            // Parse the token response to get the access token
             JsonNode tokenResponse = MAPPER.readTree(responseBody);
-            if (tokenResponse.has("access_token")) {
-                String accessToken = tokenResponse.get("access_token").asText();
 
-                // Fetch user info using the access token
-                UriInfo uriInfo = session.getContext().getUri();
-                RealmModel realm = session.getContext().getRealm();
-                String userInfoUrl = buildUserInfoEndpointUrl(uriInfo, realm);
+            if (tokenResponse.has("id_token")) {
+                String idToken = tokenResponse.get("id_token").asText();
 
-                JsonNode userInfo = fetchUserInfo(userInfoUrl, accessToken);
+                try {
+                    ObjectNode userInfo = extractUserInfoFromIdToken(idToken);
 
-                // Create a combined response with both token and user metadata
-                return createCombinedResponse(tokenResponse, userInfo);
+                    return createCombinedResponse(tokenResponse, userInfo);
+                } catch (Exception e) {
+                    LOG.error("Error extracting user info from ID token", e);
+                }
             }
 
-            // If we couldn't get the access token for some reason, return the original response
-            return Response.status(statusCode)
-                    .entity(responseBody)
-                    .type(MediaType.APPLICATION_JSON_TYPE)
-                    .build();
+            return createCombinedResponse(tokenResponse, MAPPER.createObjectNode());
         }
     }
 
     /**
-     * Fetch user information from the OIDC userinfo endpoint
+     * Extract user information from the ID token
      */
-    private JsonNode fetchUserInfo(String userInfoUrl, String accessToken) throws IOException {
-        LOG.debug("Fetching user info from: " + userInfoUrl);
+    private ObjectNode extractUserInfoFromIdToken(String idToken) {
+        try {
+            IDToken token = TokenVerifier.create(idToken, IDToken.class).getToken();
+            ObjectNode userInfo = MAPPER.createObjectNode();
 
-        // Get the HttpClient from Keycloak's HttpClientProvider
-        CloseableHttpClient httpClient = session.getProvider(HttpClientProvider.class).getHttpClient();
 
-        // Create GET request to userinfo endpoint
-        org.apache.http.client.methods.HttpGet httpGet = new org.apache.http.client.methods.HttpGet(userInfoUrl);
-        httpGet.setHeader("Authorization", "Bearer " + accessToken);
-
-        // Execute request
-        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
-            // Get response status
-            int statusCode = response.getStatusLine().getStatusCode();
-
-            // Get response body
-            String responseBody = EntityUtils.toString(response.getEntity());
-
-            if (statusCode == 200) {
-                return MAPPER.readTree(responseBody);
-            } else {
-                LOG.warnf("Failed to get user info, status: %d, response: %s", statusCode, responseBody);
-                return MAPPER.createObjectNode();
+            if (token.getSubject() != null) {
+                userInfo.put("sub", token.getSubject());
             }
+
+            if (token.getPreferredUsername() != null) {
+                userInfo.put("preferred_username", token.getPreferredUsername());
+            }
+
+            if (token.getName() != null) {
+                userInfo.put("name", token.getName());
+            }
+
+            if (token.getGivenName() != null) {
+                userInfo.put("given_name", token.getGivenName());
+            }
+
+            if (token.getFamilyName() != null) {
+                userInfo.put("family_name", token.getFamilyName());
+            }
+
+            if (token.getEmail() != null) {
+                userInfo.put("email", token.getEmail());
+                userInfo.put("email_verified", token.getEmailVerified());
+            }
+
+            // Add other claims (Legacy ones added by the Bridge mapper)
+            Map<String, Object> otherClaims = token.getOtherClaims();
+            if (otherClaims != null && !otherClaims.isEmpty()) {
+                for (Map.Entry<String, Object> entry : otherClaims.entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+
+                    if (value instanceof String) {
+                        userInfo.put(key, (String) value);
+                    } else if (value instanceof Integer) {
+                        userInfo.put(key, (Integer) value);
+                    } else if (value instanceof Long) {
+                        userInfo.put(key, (Long) value);
+                    } else if (value instanceof Double) {
+                        userInfo.put(key, (Double) value);
+                    } else if (value instanceof Float) {
+                        userInfo.put(key, (Float) value);
+                    } else if (value instanceof Boolean) {
+                        userInfo.put(key, (Boolean) value);
+                    } else if (value != null) {
+                        // Convert other types to string
+                        userInfo.put(key, String.valueOf(value));
+                    }
+                }
+            }
+
+            return userInfo;
+        } catch (Exception e) {
+            LOG.error("Error parsing ID token", e);
+            throw new RuntimeException("Failed to parse ID token", e);
         }
     }
 
@@ -289,15 +295,12 @@ public class BridgeResourceProvider implements RealmResourceProvider {
      * This is required to comply with the legacy clients that expect a specific format/contract.
      */
     private Response createCombinedResponse(JsonNode tokenResponse, JsonNode userInfo) throws IOException {
-        // Create our new response structure with only two root nodes: token and user
         ObjectNode combined = MAPPER.createObjectNode();
-
-        // Create the token object that will contain all token-related fields
         ObjectNode tokenNode = MAPPER.createObjectNode();
 
         // Add all token fields from the original response to the token node
         tokenResponse.fieldNames().forEachRemaining(fieldName -> {
-            // Skip access_token as we'll add it specifically as "token"
+            // Skip access_token, it will be added as "token" later
             if (!fieldName.equals("access_token")) {
                 tokenNode.set(fieldName, tokenResponse.get(fieldName));
             }
@@ -311,10 +314,8 @@ public class BridgeResourceProvider implements RealmResourceProvider {
         // Add creation timestamp to the token node
         tokenNode.put("created_at", System.currentTimeMillis() / 1000); // Current time in seconds
 
-        // Add the token node to the combined response
+        // Add the root members to comply with legacy contract
         combined.set("token", tokenNode);
-
-        // Add user info under the user member
         combined.set("user", userInfo);
 
         return Response.ok(MAPPER.writeValueAsString(combined), MediaType.APPLICATION_JSON_TYPE).build();
