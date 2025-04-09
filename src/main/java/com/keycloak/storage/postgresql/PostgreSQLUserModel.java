@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Model class representing a user from PostgreSQL database
+ * Model class representing a user entity from PostgreSQL database
  */
 public class PostgreSQLUserModel {
 

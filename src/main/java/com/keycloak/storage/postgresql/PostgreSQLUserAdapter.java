@@ -4,6 +4,7 @@ import org.keycloak.component.ComponentModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.SubjectCredentialManager;
+import org.keycloak.models.UserModel;
 import org.keycloak.storage.ReadOnlyException;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
@@ -14,7 +15,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Adapter that maps a PostgreSQL user to Keycloak's UserModel in read-only mode
+ * Adapter that maps a PostgreSQL user to Keycloak's UserModel
  */
 public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
@@ -27,12 +28,14 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
     private final String keycloakId;
     private final SubjectCredentialManager credentialManager;
 
-    private static final List<String> IGNORE_FIELDS = List.of(
-            // Directly mapped by Keycloak
-            PostgreSQLUserModel.FIELD_EMAIL,
-            PostgreSQLUserModel.FIELD_EMAIL_VERIFIED,
-            PostgreSQLUserModel.FIELD_FIRST_NAME,
-            PostgreSQLUserModel.FIELD_LAST_NAME,
+    private static final Map<String, String> DEFAULT_MAPPED_ATTRIBUTES = Map.of(
+        PostgreSQLUserModel.FIELD_EMAIL, UserModel.EMAIL,
+        PostgreSQLUserModel.FIELD_EMAIL_VERIFIED, UserModel.EMAIL_VERIFIED,
+        PostgreSQLUserModel.FIELD_FIRST_NAME, UserModel.FIRST_NAME,
+        PostgreSQLUserModel.FIELD_LAST_NAME, UserModel.LAST_NAME
+    );
+
+    private static final List<String> IGNORE_ATTRIBUTES = List.of(
             // Indirectly mapped by Keycloak through federation
             PostgreSQLUserModel.FIELD_DISABLED,
             PostgreSQLUserModel.FIELD_PASSWORD_DIGEST,
@@ -61,7 +64,6 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     @Override
     public String getUsername() {
-        // Use email as username
         return pgUser.getEmail();
     }
 
@@ -151,12 +153,25 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
         Map<String, String> attributes = pgUser.getAttributes();
         Map<String, List<String>> result = super.getAttributes();
 
-        // Add all the attributes from the PostgreSQL user with the federation prefix
+        // First, add the standard Keycloak attributes from our user model
+        // using the correct Keycloak UserModel attribute keys
+        for (Map.Entry<String, String> entry : DEFAULT_MAPPED_ATTRIBUTES.entrySet()) {
+            String pgField = entry.getKey();
+            String keycloakField = entry.getValue();
+            String value = attributes.get(pgField);
+
+            if (value != null) {
+                result.put(keycloakField, Collections.singletonList(value));
+            }
+        }
+
+        // Then add all the other non-standard attributes with the federation prefix
         for (Map.Entry<String, String> entry : attributes.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
 
-            if (value != null && !IGNORE_FIELDS.contains(key)) {
+            // Skip standard attributes (already added above) and ignored attributes
+            if (value != null && !DEFAULT_MAPPED_ATTRIBUTES.containsKey(key) && !IGNORE_ATTRIBUTES.contains(key)) {
                 // TODO: Handle multiple values
                 result.put(FEDERATION_ATTRIBUTE_PREFIX + key.toUpperCase(), Collections.singletonList(value));
             }
@@ -167,9 +182,8 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     @Override
     public Stream<String> getAttributeStream(String name) {
-        // If it's a standard attribute mapped directly, use the super implementation
-        if (super.getAttributes().containsKey(name)) {
-            return super.getAttributeStream(name);
+        if (this.getAttributes().containsKey(name)) {
+            return this.getAttributeStream(name);
         }
 
         // Check if it's one of our prefixed attributes
