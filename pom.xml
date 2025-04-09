@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.keycloak</groupId>
-    <artifactId>keycloak-bridge-spis</artifactId>
-    <version>1.0.0</version>
+    <artifactId>bridge-spis</artifactId>
+    <version>0.1.0</version>
     <packaging>jar</packaging>
 
-    <name>Keycloak PostgreSQL User Storage Provider</name>
-    <description>Keycloak User Storage SPI implementation for PostgreSQL database</description>
+    <name>Keycloak Bridge Service Provider Implementations</name>
+    <description>A collection of SPIs that bridge our existing auth system with Keycloak</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -97,6 +97,7 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -112,6 +113,7 @@
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.7.1</version>
                 <configuration>
+                    <appendAssemblyId>true</appendAssemblyId>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>

@@ -46,8 +46,8 @@ public class BridgeResourceProviderIT {
             .withAdminPassword("admin")
             .withRealmImportFile("test-realm.json")
             .withCopyFileToContainer(
-                    MountableFile.forHostPath("target/keycloak-bridge-spis-1.0.0-jar-with-dependencies.jar"),
-                    "/opt/keycloak/providers/keycloak-bridge-spis-1.0.0-jar-with-dependencies.jar"
+                    MountableFile.forHostPath("target/bridge-spis-jar-with-dependencies.jar"),
+                    "/opt/keycloak/providers/bridge-spis-jar-with-dependencies.jar"
             )
             // Set bridge client ID on bridge realm resource. The env one is commented out since effectively achieves the same
             .withCustomCommand("--spi-realm-restapi-extension-bridge-client-id="+TEST_CLIENT_ID_STRING)

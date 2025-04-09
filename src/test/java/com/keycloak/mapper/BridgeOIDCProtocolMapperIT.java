@@ -60,8 +60,8 @@ public class BridgeOIDCProtocolMapperIT {
             .withAdminPassword("admin")
             .withRealmImportFile("test-realm.json")
             .withCopyFileToContainer(
-                    MountableFile.forHostPath("target/keycloak-bridge-spis-1.0.0-jar-with-dependencies.jar"),
-                    "/opt/keycloak/providers/keycloak-bridge-spis-1.0.0-jar-with-dependencies.jar"
+                    MountableFile.forHostPath("target/bridge-spis-jar-with-dependencies.jar"),
+                    "/opt/keycloak/providers/bridge-spis-jar-with-dependencies.jar"
             )
             .withEnv("KC_SPI_PROVIDERS", "classpath:/providers/")
             .withStartupTimeout(Duration.ofMinutes(2))
