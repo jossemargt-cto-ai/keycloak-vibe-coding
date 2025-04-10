@@ -224,6 +224,13 @@ public class PostgreSQLConnectionManager {
             String value = rs.getString(i);
 
             if (value != null) {
+                // Handle PostgreSQL boolean values ('t'/'f') conversion to proper "true"/"false" strings
+                if (metaData.getColumnType(i) == Types.BOOLEAN ||
+                    (value.equals("t") || value.equals("f"))) {
+                    // Convert 't' to "true" and 'f' to "false"
+                    value = "t".equals(value) ? "true" : "f".equals(value) ? "false" : value;
+                }
+
                 user.setAttribute(columnName, value);
             }
         }
