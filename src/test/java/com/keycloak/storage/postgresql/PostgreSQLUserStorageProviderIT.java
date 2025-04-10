@@ -124,7 +124,7 @@ public class PostgreSQLUserStorageProviderIT {
     }
 
     @Test
-    @Disabled("False positive. It will always use the federated user, since we never imported it as local")
+    @Disabled("False positive. It will always use the federated user since we never imported it as local")
     void testUserImportedAfterFirstLogin() {
         // First, authenticate the user
         Keycloak userClient = Keycloak.getInstance(
