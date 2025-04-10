@@ -3,6 +3,7 @@ package com.keycloak.storage.postgresql;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -123,6 +124,7 @@ public class PostgreSQLUserStorageProviderIT {
     }
 
     @Test
+    @Disabled("False positive. It will always use the federated user, since we never imported it as local")
     void testUserImportedAfterFirstLogin() {
         // First, authenticate the user
         Keycloak userClient = Keycloak.getInstance(

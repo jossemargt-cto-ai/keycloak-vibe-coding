@@ -144,17 +144,25 @@ public class PostgreSQLUserStorageProvider implements
 
         boolean isValid = BcryptCredentialManager.validatePassword(plainPassword, storedPasswordHash);
 
-        if (!isValid || !importUsers) {
-            return isValid;
+        // Invalid password
+        if (!isValid) {
+            return false;
         }
 
-        String federationLink = user.getFederationLink();
-        if (federationLink == null || !federationLink.equals(model.getId())) {
+        // Import Users cap. is off
+        if (!importUsers) {
             return true;
         }
 
-        UserModel localUser = session.users().getUserByEmail(realm, user.getEmail());
+        // Find local user (not federated) that matches the same email
+        UserModel localUser = session.users().searchForUserByUserAttributeStream(realm, UserModel.EMAIL, user.getEmail())
+            .filter(u -> u.getFederationLink() == null)
+            .findFirst()
+            .orElse(null);
         boolean isLocalUser = localUser != null && localUser.getId().equals(user.getId());
+
+        // FIXME: It doesn't work as expected since the model is not a PostgreSQLUserAdapter
+        // Since we might need to implement a UserFederatedStorage we'll pin this for later
         if (!isLocalUser && user instanceof PostgreSQLUserAdapter) {
             PostgreSQLUserAdapter adapter = (PostgreSQLUserAdapter) user;
             localUser = importUser(realm, adapter);
@@ -182,7 +190,6 @@ public class PostgreSQLUserStorageProvider implements
      */
     private UserModel importUser(RealmModel realm, PostgreSQLUserAdapter adapter) {
         UserModel imported = session.users().addUser(realm, adapter.getEmail());
-        imported.setFederationLink(model.getId()); // Set federation link so Keycloak can determine origin/ownership upon sync
         imported.setEnabled(adapter.isEnabled());
         imported.setEmail(adapter.getEmail());
         imported.setEmailVerified(adapter.isEmailVerified());
