@@ -20,18 +20,44 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Protocol mapper bridges the gap between legacy and OIDC ID token and UserInfo formats.
+ * Protocol mapper bridges the gap between legacy and OIDC ID token and UserInfo
+ * formats.
  */
-public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper implements OIDCIDTokenMapper, UserInfoTokenMapper {
+public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper
+        implements OIDCIDTokenMapper, UserInfoTokenMapper {
 
     public static final String PROVIDER_ID = "bridge-OIDC-protocol-mapper";
 
     private static final List<ProviderConfigProperty> configProperties = new ArrayList<>();
 
-	@Override
-	public String getDisplayCategory() {
-		return TOKEN_MAPPER_CATEGORY;
-	}
+    // List of all fields to check for mapping
+    private static final String[] ALL_FIELDS_TO_MAP = {
+            PostgreSQLUserModel.FIELD_ID,
+            PostgreSQLUserModel.FIELD_BUSINESS_NAME,
+            PostgreSQLUserModel.FIELD_BUSINESS_TYPE,
+            PostgreSQLUserModel.FIELD_BUSINESS_USER,
+            PostgreSQLUserModel.FIELD_CONFIRMED,
+            PostgreSQLUserModel.FIELD_LEGACY,
+            PostgreSQLUserModel.FIELD_PAYMENT_ISSUE,
+            PostgreSQLUserModel.FIELD_PHONE_NUMBER,
+            PostgreSQLUserModel.FIELD_ROLE,
+            PostgreSQLUserModel.FIELD_SUBROLE,
+            PostgreSQLUserModel.FIELD_ROLE_ID,
+            // TODO: Add role name as just role
+            // TODO: Add organization_id
+            // TODO: Add driver_user
+            PostgreSQLUserModel.FIELD_USER_CODE,
+            PostgreSQLUserModel.FIELD_CREATED_AT,
+            PostgreSQLUserModel.FIELD_UPDATED_AT,
+            PostgreSQLUserModel.FIELD_STRIPE_CUSTOMER_ID
+            // TODO: Add orders
+            // TODO: add closets
+    };
+
+    @Override
+    public String getDisplayCategory() {
+        return TOKEN_MAPPER_CATEGORY;
+    }
 
     @Override
     public String getDisplayType() {
@@ -59,101 +85,58 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper impleme
 
     @Override
     protected void setClaim(IDToken token, ProtocolMapperModel mappingModel, UserSessionModel userSession,
-                           KeycloakSession keycloakSession, ClientSessionContext clientSessionCtx) {
+            KeycloakSession keycloakSession, ClientSessionContext clientSessionCtx) {
         UserModel user = userSession.getUser();
-
         Map<String, List<String>> attributes = user.getAttributes();
-        if (attributes == null || attributes.isEmpty()) {
-            return;
-        }
 
-        for (Map.Entry<String, List<String>> entry : attributes.entrySet()) {
-            String key = entry.getKey();
-            List<String> values = entry.getValue();
-
-            if (values == null || values.isEmpty() || key == null || key.isEmpty()) {
+        // Iterate through all field constants and map them
+        for (String fieldName : ALL_FIELDS_TO_MAP) {
+            if (isIgnoredField(fieldName)) {
                 continue;
             }
 
-            if (!key.startsWith(PostgreSQLUserAdapter.FEDERATION_ATTRIBUTE_PREFIX)) {
-                continue;
-            }
+            String attributeKey = PostgreSQLUserAdapter.FEDERATION_ATTRIBUTE_PREFIX + fieldName.toUpperCase();
+            String claimName = formatClaimName(fieldName);
 
-            String attributeName = key.substring(PostgreSQLUserAdapter.FEDERATION_ATTRIBUTE_PREFIX.length()).toLowerCase();
-            if (!isFieldConstant(attributeName) || isIgnoredField(attributeName)) {
-                continue;
+            // Set the claim (null if attribute is missing)
+            if (attributes != null && attributes.containsKey(attributeKey) &&
+                    attributes.get(attributeKey) != null && !attributes.get(attributeKey).isEmpty()) {
+                token.getOtherClaims().put(claimName, attributes.get(attributeKey).get(0));
+            } else {
+                token.getOtherClaims().put(claimName, null);
             }
-
-            String claimName = formatClaimName(attributeName);
-            String value = values.get(0);
-            token.getOtherClaims().put(claimName, value);
         }
     }
 
     /**
-     * Checks if the given field name corresponds to a constant field in PostgreSQLUserModel
-     */
-    private boolean isFieldConstant(String fieldName) {
-        return fieldName.equals(PostgreSQLUserModel.FIELD_ID) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_BUSINESS_NAME) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_BUSINESS_TYPE) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_BUSINESS_USER) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_CONFIRMED) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_CONFIRMED_AT) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_DELETED_AT) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_LEGACY) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_PAYMENT_ISSUE) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_PHONE_NUMBER) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_PROFILE_PIC) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_ROLE) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_SUBROLE) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_USER_CODE) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_CREATED_AT) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_ROLE_ID) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_STRIPE_CUSTOMER_ID);
-    }
-
-    /**
-     * Checks if the given field name is in the IGNORE_FIELDS list of PostgreSQLUserAdapter
+     * Checks if the given field name is in the IGNORE_FIELDS list of
+     * PostgreSQLUserAdapter
      */
     private boolean isIgnoredField(String fieldName) {
-        return fieldName.equals(PostgreSQLUserModel.FIELD_EMAIL) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_EMAIL_VERIFIED) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_FIRST_NAME) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_LAST_NAME) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_DISABLED) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_PASSWORD_DIGEST) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_CONFIRMATION_TOKEN) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_LAST_LOGIN_AT) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_RESET_PASSWORD_TOKEN) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT) ||
-               fieldName.equals(PostgreSQLUserModel.FIELD_UPDATED_AT);
+        return fieldName.equals(PostgreSQLUserModel.FIELD_EMAIL) || // Standard claim
+                fieldName.equals(PostgreSQLUserModel.FIELD_EMAIL_VERIFIED) || // Standard claim
+                fieldName.equals(PostgreSQLUserModel.FIELD_FIRST_NAME) || // Standard claim
+                fieldName.equals(PostgreSQLUserModel.FIELD_LAST_NAME) || // Standard claim
+                fieldName.equals(PostgreSQLUserModel.FIELD_DISABLED) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_PASSWORD_DIGEST) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_CONFIRMATION_TOKEN) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_LAST_LOGIN_AT) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_RESET_PASSWORD_TOKEN) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_DELETED_AT) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_PROFILE_PIC) ||
+                fieldName.equals(PostgreSQLUserModel.FIELD_CONFIRMED_AT);
     }
 
     /**
-     * Format the attribute name to a claim-friendly format (from snake to camel case).
+     * Format the attribute name to the format expected by the client (lower snake
+     * cases).
      */
     private String formatClaimName(String attributeName) {
         if (attributeName == null || attributeName.isEmpty()) {
             return attributeName;
         }
 
-        StringBuilder result = new StringBuilder();
-        boolean capitalizeNext = false;
-
-        for (char c : attributeName.toCharArray()) {
-            if (c == '_') {
-                capitalizeNext = true;
-            } else {
-                if (capitalizeNext) {
-                    result.append(Character.toUpperCase(c));
-                    capitalizeNext = false;
-                } else {
-                    result.append(c);
-                }
-            }
-        }
-
-        return result.toString();
+        return attributeName.toLowerCase().replaceAll("-", "_");
     }
 }

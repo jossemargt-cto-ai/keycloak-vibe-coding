@@ -111,14 +111,14 @@ public class BridgeOIDCProtocolMapperIT {
         IDToken token = verifier.getToken();
 
         // Verify the expected claims
-        assertNotNull(token.getOtherClaims().get("businessName"), "businessName claim should be present");
-        assertEquals(TEST_BUSINESS_NAME, token.getOtherClaims().get("businessName").toString());
+        assertNotNull(token.getOtherClaims().get("business_name"), "business_name claim should be present");
+        assertEquals(TEST_BUSINESS_NAME, token.getOtherClaims().get("business_name").toString());
 
-        assertNotNull(token.getOtherClaims().get("userCode") , "userCode claim should be present");
-        assertEquals(TEST_USER_CODE, token.getOtherClaims().get("userCode").toString());
+        assertNotNull(token.getOtherClaims().get("user_code") , "user_code claim should be present");
+        assertEquals(TEST_USER_CODE, token.getOtherClaims().get("user_code").toString());
 
-        assertNotNull(token.getOtherClaims().get("businessType") , "businessType claim should be present");
-        assertEquals(TEST_BUSINESS_TYPE, token.getOtherClaims().get("businessType").toString());
+        assertNotNull(token.getOtherClaims().get("business_type") , "business_type claim should be present");
+        assertEquals(TEST_BUSINESS_TYPE, token.getOtherClaims().get("business_type").toString());
 
         assertNotNull(token.getOtherClaims().get("role") , "role claim should be present");
         assertEquals(TEST_ROLE, token.getOtherClaims().get("role").toString());
@@ -148,14 +148,14 @@ public class BridgeOIDCProtocolMapperIT {
         JsonNode userInfoJson = MAPPER.readTree(responseBody);
 
         // Verify that the bridge mapped claims are present in the UserInfo response
-        assertTrue(userInfoJson.has("businessName"), "businessName claim should be present");
-        assertEquals(TEST_BUSINESS_NAME, userInfoJson.get("businessName").asText());
+        assertTrue(userInfoJson.has("business_name"), "business_name claim should be present");
+        assertEquals(TEST_BUSINESS_NAME, userInfoJson.get("business_name").asText());
 
-        assertTrue(userInfoJson.has("userCode"), "userCode claim should be present");
-        assertEquals(TEST_USER_CODE, userInfoJson.get("userCode").asText());
+        assertTrue(userInfoJson.has("user_code"), "user_code claim should be present");
+        assertEquals(TEST_USER_CODE, userInfoJson.get("user_code").asText());
 
-        assertTrue(userInfoJson.has("businessType"), "businessType claim should be present");
-        assertEquals(TEST_BUSINESS_TYPE, userInfoJson.get("businessType").asText());
+        assertTrue(userInfoJson.has("business_type"), "business_type claim should be present");
+        assertEquals(TEST_BUSINESS_TYPE, userInfoJson.get("business_type").asText());
 
         assertTrue(userInfoJson.has("role"), "role claim should be present");
         assertEquals(TEST_ROLE, userInfoJson.get("role").asText());

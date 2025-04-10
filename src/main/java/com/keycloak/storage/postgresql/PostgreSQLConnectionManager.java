@@ -48,11 +48,11 @@ public class PostgreSQLConnectionManager {
      */
     public String getPasswordHash(String email) {
         String sql = "SELECT " + PostgreSQLUserModel.FIELD_PASSWORD_DIGEST +
-                     " FROM " + usersTableName +
-                     " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
+                " FROM " + usersTableName +
+                " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
 
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -79,10 +79,10 @@ public class PostgreSQLConnectionManager {
      */
     public PostgreSQLUserModel getUserById(String id) {
         String sql = "SELECT * FROM " + usersTableName +
-                     " WHERE " + PostgreSQLUserModel.FIELD_ID + " = ?::uuid";
+                " WHERE " + PostgreSQLUserModel.FIELD_ID + " = ?::uuid";
 
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, id);
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -102,10 +102,10 @@ public class PostgreSQLConnectionManager {
      */
     public PostgreSQLUserModel getUserByEmail(String email) {
         String sql = "SELECT * FROM " + usersTableName +
-                     " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
+                " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
 
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -128,7 +128,7 @@ public class PostgreSQLConnectionManager {
         String column;
 
         // Map attribute name to column name
-        switch(attributeName) {
+        switch (attributeName) {
             case "username":
                 column = PostgreSQLUserModel.FIELD_EMAIL; // Since email is username
                 break;
@@ -146,11 +146,11 @@ public class PostgreSQLConnectionManager {
         }
 
         String sql = "SELECT * FROM " + usersTableName +
-                     " WHERE " + column + " LIKE ?" +
-                     " LIMIT " + maxResults;
+                " WHERE " + column + " LIKE ?" +
+                " LIMIT " + maxResults;
 
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, "%" + search + "%");
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -172,10 +172,10 @@ public class PostgreSQLConnectionManager {
         List<PostgreSQLUserModel> users = new ArrayList<>();
 
         String sql = "SELECT * FROM " + usersTableName +
-                     " LIMIT ? OFFSET ?";
+                " LIMIT ? OFFSET ?";
 
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maxResults);
             ps.setInt(2, firstResult);
 
@@ -198,8 +198,8 @@ public class PostgreSQLConnectionManager {
         String sql = "SELECT COUNT(*) FROM " + usersTableName;
 
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 return rs.getInt(1);
             }
@@ -223,16 +223,16 @@ public class PostgreSQLConnectionManager {
             String columnName = metaData.getColumnName(i).toLowerCase();
             String value = rs.getString(i);
 
-            if (value != null) {
-                // Handle PostgreSQL boolean values ('t'/'f') conversion to proper "true"/"false" strings
-                if (metaData.getColumnType(i) == Types.BOOLEAN ||
-                    (value.equals("t") || value.equals("f"))) {
-                    // Convert 't' to "true" and 'f' to "false"
-                    value = "t".equals(value) ? "true" : "f".equals(value) ? "false" : value;
-                }
-
-                user.setAttribute(columnName, value);
+            if (value == null) {
+                continue;
             }
+
+            // Handle PostgreSQL boolean values ('t'/'f') conversion to proper "true"/"false" strings
+            if (metaData.getColumnType(i) == Types.BOOLEAN) {
+                value = "t".equals(value) ? "true" : "f".equals(value) ? "false" : value;
+            }
+
+            user.setAttribute(columnName, value);
         }
 
         return user;
