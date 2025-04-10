@@ -128,7 +128,7 @@ public class BridgeResourceProvider implements RealmResourceProvider {
             return forwardTokenRequest(tokenEndpointUrl, formParams);
 
         } catch (IOException e) {
-            LOG.error("Error parsing request payload", e);
+            LOG.debug("Error parsing request payload", e);
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity("{\"error\":\"invalid_request\",\"error_description\":\"Invalid JSON payload\"}")
                     .type(MediaType.APPLICATION_JSON_TYPE)

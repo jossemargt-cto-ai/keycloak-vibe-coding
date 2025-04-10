@@ -246,9 +246,6 @@ public class BridgeResourceProviderIT {
                 "Error description should indicate missing credentials");
     }
 
-    // This by design will throw an exception Keycloak side, so don't worry about it. It should see like something among the lines of:
-    //
-    // com.fasterxml.jackson.core.JsonParseException: Unexpected character ('i' (code 105)): was expecting double-quote to start field name
     @Test
     void testBridgeTokenEndpointWithInvalidJson() throws Exception {
         // Build the bridge token endpoint URL
