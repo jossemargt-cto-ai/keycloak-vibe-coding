@@ -40,18 +40,20 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper
             PostgreSQLUserModel.FIELD_LEGACY,
             PostgreSQLUserModel.FIELD_PAYMENT_ISSUE,
             PostgreSQLUserModel.FIELD_PHONE_NUMBER,
-            PostgreSQLUserModel.FIELD_ROLE,
-            PostgreSQLUserModel.FIELD_SUBROLE,
-            PostgreSQLUserModel.FIELD_ROLE_ID,
-            // TODO: Add role name as just role
-            // TODO: Add organization_id
-            // TODO: Add driver_user
             PostgreSQLUserModel.FIELD_USER_CODE,
             PostgreSQLUserModel.FIELD_CREATED_AT,
             PostgreSQLUserModel.FIELD_UPDATED_AT,
-            PostgreSQLUserModel.FIELD_STRIPE_CUSTOMER_ID
-            // TODO: Add orders
-            // TODO: add closets
+            PostgreSQLUserModel.FIELD_STRIPE_CUSTOMER_ID,
+            // Role releated claims
+            PostgreSQLUserModel.FIELD_ROLE,
+            PostgreSQLUserModel.FIELD_SUBROLE,
+            PostgreSQLUserModel.FIELD_ORGANIZATION_ROLE,
+            PostgreSQLUserModel.FIELD_ORGANIZATION_ROLE_ID,
+            PostgreSQLUserModel.FIELD_ORGANIZATION_ID,
+            // Dummy null claims (not implemented yet)
+            PostgreSQLUserModel.FIELD_DRIVER_USER,
+            PostgreSQLUserModel.FIELD_ORDERS,
+            PostgreSQLUserModel.FIELD_CLOSETS
     };
 
     @Override
