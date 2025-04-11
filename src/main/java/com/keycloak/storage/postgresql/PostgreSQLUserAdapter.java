@@ -43,8 +43,7 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
             PostgreSQLUserModel.FIELD_CONFIRMATION_TOKEN,
             PostgreSQLUserModel.FIELD_LAST_LOGIN_AT,
             PostgreSQLUserModel.FIELD_RESET_PASSWORD_TOKEN,
-            PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT,
-            PostgreSQLUserModel.FIELD_UPDATED_AT
+            PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT
     );
 
     public PostgreSQLUserAdapter(KeycloakSession session, RealmModel realm,

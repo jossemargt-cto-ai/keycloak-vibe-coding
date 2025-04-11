@@ -160,28 +160,57 @@ public class PostgreSQLUserStorageProviderIT {
                 postgreSQLContainer.getUsername(),
                 postgreSQLContainer.getPassword())) {
 
-            // Create users table
+            // Create roles table first (as it's referenced by users)
+            conn.createStatement().execute(
+                    "CREATE TABLE IF NOT EXISTS roles (" +
+                    "  id UUID PRIMARY KEY," +
+                    "  name VARCHAR(255) NOT NULL," +
+                    "  created_at TIMESTAMP NOT NULL," +
+                    "  updated_at TIMESTAMP NOT NULL," +
+                    "  organization_id UUID NOT NULL" +
+                    ")"
+            );
+
+            // Create users table with reference to roles
             conn.createStatement().execute(
                     "CREATE TABLE IF NOT EXISTS users (" +
                     "  id UUID PRIMARY KEY," +
                     "  email VARCHAR(255) NOT NULL UNIQUE," +
                     "  first_name VARCHAR(255)," +
                     "  last_name VARCHAR(255)," +
-                    "  password_digest VARCHAR(255) NOT NULL" +
+                    "  password_digest VARCHAR(255) NOT NULL," +
+                    "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                    "  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                    "  role INTEGER DEFAULT 0 NOT NULL," +
+                    "  role_id UUID," +
+                    "  CONSTRAINT fk_role_id FOREIGN KEY (role_id) REFERENCES roles(id)" +
                     ")"
             );
+
+            // Create a test role
+            UUID roleId = UUID.randomUUID();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO roles (id, name, created_at, updated_at, organization_id) " +
+                    "VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)")) {
+                ps.setObject(1, roleId);
+                ps.setString(2, "TestRole");
+                ps.setObject(3, UUID.randomUUID()); // Organization ID
+                ps.executeUpdate();
+            }
 
             // Insert a test user with bcrypt password hash for 'testpassword'
             String bcryptHash = "$2y$12$cKlMe72KCTF6iMVk2SIFpegWs3tvq3.GwrhAXRKOmh16GIzOuR7Sq";
 
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO users (id, email, first_name, last_name, password_digest) " +
-                    "VALUES (?, ?, ?, ?, ?)")) {
+                    "INSERT INTO users (id, email, first_name, last_name, password_digest, created_at, updated_at, role, role_id) " +
+                    "VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)")) {
                 ps.setObject(1, UUID.randomUUID());
                 ps.setString(2, TEST_USER_EMAIL);
                 ps.setString(3, "Test");
                 ps.setString(4, "User");
                 ps.setString(5, bcryptHash);
+                ps.setInt(6, 0); // Default role value
+                ps.setObject(7, roleId); // Set the role_id to reference the created role
                 ps.executeUpdate();
             }
         }

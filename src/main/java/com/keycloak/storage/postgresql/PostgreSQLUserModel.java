@@ -32,13 +32,23 @@ public class PostgreSQLUserModel {
     public static final String FIELD_PROFILE_PIC = "profile_pic";
     public static final String FIELD_RESET_PASSWORD_CREATED_AT = "reset_password_created_at";
     public static final String FIELD_RESET_PASSWORD_TOKEN = "reset_password_token";
-    public static final String FIELD_ROLE = "role";
-    public static final String FIELD_SUBROLE = "subrole";
+    public static final String FIELD_STRIPE_CUSTOMER_ID = "stripe_customer_id";
     public static final String FIELD_USER_CODE = "user_code";
     public static final String FIELD_CREATED_AT = "created_at";
     public static final String FIELD_UPDATED_AT = "updated_at";
-    public static final String FIELD_ROLE_ID = "role_id";
-    public static final String FIELD_STRIPE_CUSTOMER_ID = "stripe_customer_id";
+    public static final String FIELD_ROLE = "role"; // Legacy role enum
+    public static final String FIELD_SUBROLE = "subrole"; // Legacy subrole enum
+    public static final String FIELD_ROLE_ID = "role_id"; // This shouldn't come but retain it as catch-all
+
+    // Constants for role-related fields from JOIN
+    public static final String FIELD_ORGANIZATION_ROLE = "organization_role";
+    public static final String FIELD_ORGANIZATION_ROLE_ID = "organization_role_id";
+    public static final String FIELD_ORGANIZATION_ID = "organization_id";
+
+    // Constants for driver_user, orders and closets (not implemented yet)
+    public static final String FIELD_DRIVER_USER = "driver_user";
+    public static final String FIELD_ORDERS = "orders";
+    public static final String FIELD_CLOSETS = "closets";
 
     // The map containing all user attributes
     private final Map<String, String> attributes = new HashMap<>();

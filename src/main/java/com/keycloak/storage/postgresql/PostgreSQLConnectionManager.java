@@ -78,8 +78,10 @@ public class PostgreSQLConnectionManager {
      * Gets user by ID (UUID)
      */
     public PostgreSQLUserModel getUserById(String id) {
-        String sql = "SELECT * FROM " + usersTableName +
-                " WHERE " + PostgreSQLUserModel.FIELD_ID + " = ?::uuid";
+        String sql = "SELECT u.*, u.role_id as organization_role_id, r.name as organization_role, r.organization_id " +
+                "FROM " + usersTableName + " u " +
+                "LEFT JOIN roles r ON u.role_id = r.id " +
+                "WHERE u." + PostgreSQLUserModel.FIELD_ID + " = ?::uuid";
 
         try (Connection conn = getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -101,8 +103,10 @@ public class PostgreSQLConnectionManager {
      * Gets user by email
      */
     public PostgreSQLUserModel getUserByEmail(String email) {
-        String sql = "SELECT * FROM " + usersTableName +
-                " WHERE " + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
+        String sql = "SELECT u.*, u.role_id as organization_role_id, r.name as organization_role, r.organization_id " +
+                "FROM " + usersTableName + " u " +
+                "LEFT JOIN roles r ON u.role_id = r.id " +
+                "WHERE u." + PostgreSQLUserModel.FIELD_EMAIL + " = ?";
 
         try (Connection conn = getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -145,8 +149,10 @@ public class PostgreSQLConnectionManager {
                 return users; // Return empty list for unsupported attributes
         }
 
-        String sql = "SELECT * FROM " + usersTableName +
-                " WHERE " + column + " LIKE ?" +
+        String sql = "SELECT u.*, u.role_id as organization_role_id, r.name as organization_role, r.organization_id " +
+                "FROM " + usersTableName + " u " +
+                "LEFT JOIN roles r ON u.role_id = r.id " +
+                "WHERE u." + column + " LIKE ?" +
                 " LIMIT " + maxResults;
 
         try (Connection conn = getConnection();
@@ -171,8 +177,10 @@ public class PostgreSQLConnectionManager {
     public List<PostgreSQLUserModel> getAllUsers(int firstResult, int maxResults) {
         List<PostgreSQLUserModel> users = new ArrayList<>();
 
-        String sql = "SELECT * FROM " + usersTableName +
-                " LIMIT ? OFFSET ?";
+        String sql = "SELECT u.*, u.role_id as organization_role_id, r.name as organization_role, r.organization_id " +
+                "FROM " + usersTableName + " u " +
+                "LEFT JOIN roles r ON u.role_id = r.id " +
+                "LIMIT ? OFFSET ?";
 
         try (Connection conn = getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
