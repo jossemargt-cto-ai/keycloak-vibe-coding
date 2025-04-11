@@ -22,6 +22,11 @@ import java.util.Map;
 /**
  * Protocol mapper bridges the gap between legacy and OIDC ID token and UserInfo
  * formats.
+ *
+ * NOTE: There's a high chance that this componentent will be dropped in the
+ * future, if the clients are too rigid to not accept "omit when null" claims.
+ * In that scenario, the legacy claims will be added at the RealmResource level
+ * instead.
  */
 public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper
         implements OIDCIDTokenMapper, UserInfoTokenMapper {
@@ -42,7 +47,7 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper
             PostgreSQLUserModel.FIELD_PHONE_NUMBER,
             PostgreSQLUserModel.FIELD_USER_CODE,
             PostgreSQLUserModel.FIELD_CREATED_AT,
-            PostgreSQLUserModel.FIELD_UPDATED_AT,
+            // PostgreSQLUserModel.FIELD_UPDATED_AT, // FIXME: ID Token parser trips over this value
             PostgreSQLUserModel.FIELD_STRIPE_CUSTOMER_ID,
             // Role releated claims
             PostgreSQLUserModel.FIELD_ROLE,
@@ -91,7 +96,10 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper
         UserModel user = userSession.getUser();
         Map<String, List<String>> attributes = user.getAttributes();
 
-        // Iterate through all field constants and map them
+        if (attributes == null || attributes.isEmpty()) {
+            return;
+        }
+
         for (String fieldName : ALL_FIELDS_TO_MAP) {
             if (isIgnoredField(fieldName)) {
                 continue;
@@ -100,14 +108,48 @@ public class BridgeOIDCProtocolMapper extends AbstractOIDCProtocolMapper
             String attributeKey = PostgreSQLUserAdapter.FEDERATION_ATTRIBUTE_PREFIX + fieldName.toUpperCase();
             String claimName = formatClaimName(fieldName);
 
-            // Set the claim (null if attribute is missing)
-            if (attributes != null && attributes.containsKey(attributeKey) &&
-                    attributes.get(attributeKey) != null && !attributes.get(attributeKey).isEmpty()) {
-                token.getOtherClaims().put(claimName, attributes.get(attributeKey).get(0));
+            if (!attributes.containsKey(attributeKey) || attributes.get(attributeKey).isEmpty()) {
+                if (isBoolean(fieldName)) {
+                    token.getOtherClaims().put(claimName, false);
+                } else if (isNumeric(fieldName)) {
+                    token.getOtherClaims().put(claimName, 0);
+                } else {
+                    token.getOtherClaims().put(claimName, null);
+                }
+                continue;
+            }
+
+            String value = attributes.get(attributeKey).get(0);
+            if (isBoolean(fieldName)) {
+                token.getOtherClaims().put(claimName, Boolean.parseBoolean(value));
+            } else if (isNumeric(fieldName)) {
+                try {
+                    token.getOtherClaims().put(claimName, Integer.parseInt(value));
+                } catch (NumberFormatException e) {
+                    token.getOtherClaims().put(claimName, 0);
+                }
             } else {
-                token.getOtherClaims().put(claimName, null);
+                token.getOtherClaims().put(claimName, value);
             }
         }
+    }
+
+    /**
+     * Determines if a field should be treated as a boolean value
+     */
+    private boolean isBoolean(String fieldName) {
+        return fieldName.equals(PostgreSQLUserModel.FIELD_CONFIRMED) ||
+               fieldName.equals(PostgreSQLUserModel.FIELD_LEGACY) ||
+               fieldName.equals(PostgreSQLUserModel.FIELD_PAYMENT_ISSUE) ||
+               fieldName.equals(PostgreSQLUserModel.FIELD_BUSINESS_USER);
+    }
+
+    /**
+     * Determines if a field should be treated as a numeric value
+     */
+    private boolean isNumeric(String fieldName) {
+        return fieldName.equals(PostgreSQLUserModel.FIELD_ORDERS) ||
+               fieldName.equals(PostgreSQLUserModel.FIELD_CLOSETS);
     }
 
     /**

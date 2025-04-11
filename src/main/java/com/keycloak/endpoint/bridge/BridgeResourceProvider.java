@@ -223,13 +223,16 @@ public class BridgeResourceProvider implements RealmResourceProvider {
     }
 
     /**
-     * Extract user information from the ID token
+     * Extract user information from the ID token.
+     *
+     * NOTE: If the client is strict on the field names (ie. "sub" field comes from the ID token), or
+     *       the client expects explictly "null" values instead of absent fields, this method needs to
+     *       be refactored in a way it iterates over the expected fields instead of trusting the ID token.
      */
     private ObjectNode extractUserInfoFromIdToken(String idToken) {
         try {
             IDToken token = TokenVerifier.create(idToken, IDToken.class).getToken();
             ObjectNode userInfo = MAPPER.createObjectNode();
-
 
             if (token.getSubject() != null) {
                 userInfo.put("sub", token.getSubject());
@@ -258,27 +261,20 @@ public class BridgeResourceProvider implements RealmResourceProvider {
 
             // Add other claims (Legacy ones added by the Bridge mapper)
             Map<String, Object> otherClaims = token.getOtherClaims();
-            if (otherClaims != null && !otherClaims.isEmpty()) {
-                for (Map.Entry<String, Object> entry : otherClaims.entrySet()) {
-                    String key = entry.getKey();
-                    Object value = entry.getValue();
+            if (otherClaims == null) {
+                return userInfo;
+            }
 
-                    if (value instanceof String) {
-                        userInfo.put(key, (String) value);
-                    } else if (value instanceof Integer) {
-                        userInfo.put(key, (Integer) value);
-                    } else if (value instanceof Long) {
-                        userInfo.put(key, (Long) value);
-                    } else if (value instanceof Double) {
-                        userInfo.put(key, (Double) value);
-                    } else if (value instanceof Float) {
-                        userInfo.put(key, (Float) value);
-                    } else if (value instanceof Boolean) {
-                        userInfo.put(key, (Boolean) value);
-                    } else if (value != null) {
-                        // Convert other types to string
-                        userInfo.put(key, String.valueOf(value));
-                    }
+            for (Map.Entry<String, Object> entry : otherClaims.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+
+                if (value instanceof Integer) {
+                    userInfo.put(key, (Integer) value);
+                } else if (value instanceof Boolean) {
+                    userInfo.put(key, (Boolean) value);
+                } else if (value != null) {
+                    userInfo.put(key, String.valueOf(value));
                 }
             }
 
