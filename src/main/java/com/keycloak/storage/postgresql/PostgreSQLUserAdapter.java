@@ -10,6 +10,7 @@ import org.keycloak.storage.StorageId;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -23,10 +24,6 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
      * Prefix used for all federation attributes when mapping from PostgreSQL to Keycloak
      */
     public static final String FEDERATION_ATTRIBUTE_PREFIX = "FED_";
-
-    private final PostgreSQLUserModel pgUser;
-    private final String keycloakId;
-    private final SubjectCredentialManager credentialManager;
 
     private static final Map<String, String> DEFAULT_MAPPED_ATTRIBUTES = Map.of(
         PostgreSQLUserModel.FIELD_EMAIL, UserModel.EMAIL,
@@ -43,8 +40,41 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
             PostgreSQLUserModel.FIELD_CONFIRMATION_TOKEN,
             PostgreSQLUserModel.FIELD_LAST_LOGIN_AT,
             PostgreSQLUserModel.FIELD_RESET_PASSWORD_TOKEN,
-            PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT
+            PostgreSQLUserModel.FIELD_RESET_PASSWORD_CREATED_AT,
+            // Role and subrole will be handled separately
+            PostgreSQLUserModel.FIELD_ROLE,
+            PostgreSQLUserModel.FIELD_SUBROLE,
+            PostgreSQLUserModel.FIELD_ROLE_ID
     );
+
+    private static final Map<String, String> ROLE_MAP;
+    private static final Map<String, String> SUBROLE_MAP;
+    private static final String DEFAULT_ROLE = "is_client";
+
+    static {
+        // Initializing role map
+        Map<String, String> roleMap = new HashMap<>();
+        roleMap.put("0", "is_admin");
+        roleMap.put("1", "is_client");
+        roleMap.put("2", "is_fullfillment_client");
+        ROLE_MAP = Collections.unmodifiableMap(roleMap);
+
+        // Initializing subrole map
+        Map<String, String> subroleMap = new HashMap<>();
+        subroleMap.put("0", "operation_specialist");
+        subroleMap.put("1", "support");
+        subroleMap.put("2", "supervisor");
+        subroleMap.put("3", "operation_manager");
+        subroleMap.put("4", "super");
+        subroleMap.put("5", "driver");
+        subroleMap.put("6", "mover");
+        subroleMap.put("7", "god");
+        SUBROLE_MAP = Collections.unmodifiableMap(subroleMap);
+    }
+
+    private final PostgreSQLUserModel pgUser;
+    private final String keycloakId;
+    private final SubjectCredentialManager credentialManager;
 
     public PostgreSQLUserAdapter(KeycloakSession session, RealmModel realm,
                                ComponentModel storageProviderModel,
@@ -152,8 +182,6 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
         Map<String, String> attributes = pgUser.getAttributes();
         Map<String, List<String>> result = super.getAttributes();
 
-        // First, add the standard Keycloak attributes from our user model
-        // using the correct Keycloak UserModel attribute keys
         for (Map.Entry<String, String> entry : DEFAULT_MAPPED_ATTRIBUTES.entrySet()) {
             String pgField = entry.getKey();
             String keycloakField = entry.getValue();
@@ -164,15 +192,24 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
             }
         }
 
-        // Then add all the other non-standard attributes with the federation prefix
+        result.put(FEDERATION_ATTRIBUTE_PREFIX + PostgreSQLUserModel.FIELD_ROLE.toUpperCase(),
+                Collections.singletonList(mapRole(attributes.get(PostgreSQLUserModel.FIELD_ROLE))));
+
+        String mappedSubrole = mapSubrole(attributes.get(PostgreSQLUserModel.FIELD_SUBROLE));
+        if (mappedSubrole != null) {
+            result.put(FEDERATION_ATTRIBUTE_PREFIX + PostgreSQLUserModel.FIELD_SUBROLE.toUpperCase(),
+                    Collections.singletonList(mappedSubrole));
+        }
+
         for (Map.Entry<String, String> entry : attributes.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
 
-            // Skip standard attributes (already added above) and ignored attributes
-            if (value != null && !DEFAULT_MAPPED_ATTRIBUTES.containsKey(key) && !IGNORE_ATTRIBUTES.contains(key)) {
-                // TODO: Handle multiple values
-                result.put(FEDERATION_ATTRIBUTE_PREFIX + key.toUpperCase(), Collections.singletonList(value));
+            if (value != null &&
+                !DEFAULT_MAPPED_ATTRIBUTES.containsKey(key) &&
+                !IGNORE_ATTRIBUTES.contains(key)) {
+                result.put(FEDERATION_ATTRIBUTE_PREFIX + key.toUpperCase(),
+                        Collections.singletonList(value));
             }
         }
 
@@ -181,13 +218,19 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
 
     @Override
     public Stream<String> getAttributeStream(String name) {
-        if (this.getAttributes().containsKey(name)) {
-            return this.getAttributeStream(name);
+        if ((FEDERATION_ATTRIBUTE_PREFIX + PostgreSQLUserModel.FIELD_ROLE.toUpperCase()).equals(name)) {
+            String roleId = pgUser.getAttribute(PostgreSQLUserModel.FIELD_ROLE);
+            return Stream.of(mapRole(roleId));
         }
 
-        // Check if it's one of our prefixed attributes
+        if ((FEDERATION_ATTRIBUTE_PREFIX + PostgreSQLUserModel.FIELD_SUBROLE.toUpperCase()).equals(name)) {
+            String subroleId = pgUser.getAttribute(PostgreSQLUserModel.FIELD_SUBROLE);
+            String mappedSubrole = mapSubrole(subroleId);
+            return mappedSubrole != null ? Stream.of(mappedSubrole) : Stream.empty();
+        }
+
         if (name.startsWith(FEDERATION_ATTRIBUTE_PREFIX)) {
-            String dbFieldName = name.substring(FEDERATION_ATTRIBUTE_PREFIX.length()).toLowerCase(); // Remove the prefix and convert to lowercase
+            String dbFieldName = name.substring(FEDERATION_ATTRIBUTE_PREFIX.length()).toLowerCase();
             String value = pgUser.getAttribute(dbFieldName);
             return value != null ? Stream.of(value) : Stream.empty();
         }
@@ -205,5 +248,31 @@ public class PostgreSQLUserAdapter extends AbstractUserAdapter {
      */
     public PostgreSQLUserModel getPostgreSQLUserModel() {
         return pgUser;
+    }
+
+    /**
+     * Maps the numeric role ID to its string representation
+     *
+     * @param roleId the numeric role ID from the database
+     * @return the string representation of the role
+     */
+    private String mapRole(String roleId) {
+        if (roleId == null || roleId.isEmpty()) {
+            return DEFAULT_ROLE;
+        }
+        return ROLE_MAP.getOrDefault(roleId, DEFAULT_ROLE);
+    }
+
+    /**
+     * Maps the numeric subrole ID to its string representation
+     *
+     * @param subroleId the numeric subrole ID from the database
+     * @return the string representation of the subrole, or null if not found
+     */
+    private String mapSubrole(String subroleId) {
+        if (subroleId == null || subroleId.isEmpty()) {
+            return null;
+        }
+        return SUBROLE_MAP.get(subroleId);
     }
 }

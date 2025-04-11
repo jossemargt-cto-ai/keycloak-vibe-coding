@@ -236,7 +236,7 @@ public class PostgreSQLConnectionManager {
             }
 
             // Handle PostgreSQL boolean values ('t'/'f') conversion to proper "true"/"false" strings
-            if (metaData.getColumnType(i) == Types.BOOLEAN) {
+            if (metaData.getColumnType(i) == Types.BOOLEAN || value.length() == 1) {
                 value = "t".equals(value) ? "true" : "f".equals(value) ? "false" : value;
             }
 
